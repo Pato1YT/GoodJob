@@ -68,10 +68,12 @@ export const useAuth = () => {
         email: firebaseUser.email || email,
         firstName: userData.firstName || '',
         lastName: userData.lastName || '',
+        secondLastName: userData.secondLastName || '',
         phone: userData.phone || '',
         role: userData.role || 'employer',
         emailVerified: false,
         isActive: true,
+        createdBy: firebaseUser.uid, 
         createdAt: new Date(),
         updatedAt: new Date(),
       };
