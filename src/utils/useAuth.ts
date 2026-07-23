@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { 
   createUserWithEmailAndPassword, 
@@ -23,6 +24,7 @@ interface AuthContextType {
 }
 
 export const useAuth = () => {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -68,10 +70,12 @@ export const useAuth = () => {
         email: firebaseUser.email || email,
         firstName: userData.firstName || '',
         lastName: userData.lastName || '',
+        secondLastName: userData.secondLastName || '',
         phone: userData.phone || '',
         role: userData.role || 'employer',
         emailVerified: false,
         isActive: true,
+        createdBy: firebaseUser.uid, 
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -92,13 +96,19 @@ export const useAuth = () => {
     try {
       setError(null);
       setLoading(true);
-
       await signInWithEmailAndPassword(auth, email, password);
-      // User data will be fetched by onAuthStateChanged listener
+      
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data() as User;
+          setUser(userData);
+          router.replace('/(app)'); // ← AGREGAR ESTO - Navega al HomeScreen
+        }
+      }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Sign in failed';
-      setError(errorMessage);
-      throw err;
+      // ...
     } finally {
       setLoading(false);
     }
