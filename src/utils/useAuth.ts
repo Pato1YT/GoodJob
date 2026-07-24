@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { 
   createUserWithEmailAndPassword, 
@@ -23,6 +24,7 @@ interface AuthContextType {
 }
 
 export const useAuth = () => {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +40,10 @@ export const useAuth = () => {
             const userData = userDoc.data() as User;
             setUser(userData);
             await userStorage.save(userData);
+          } else {
+            // User exists in Auth but not in Firestore
+            setUser(null);
+            await userStorage.clear();
           }
         } else {
           setUser(null);
@@ -45,6 +51,7 @@ export const useAuth = () => {
         }
       } catch (err) {
         console.error('Error fetching user:', err);
+        setUser(null);
         setError(err instanceof Error ? err.message : 'Error loading user');
       } finally {
         setLoading(false);
@@ -68,10 +75,12 @@ export const useAuth = () => {
         email: firebaseUser.email || email,
         firstName: userData.firstName || '',
         lastName: userData.lastName || '',
+        secondLastName: userData.secondLastName || '',
         phone: userData.phone || '',
         role: userData.role || 'employer',
         emailVerified: false,
         isActive: true,
+        createdBy: firebaseUser.uid, 
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -79,6 +88,7 @@ export const useAuth = () => {
       await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
       setUser(newUser);
       await userStorage.save(newUser);
+      router.replace('/(app)');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Sign up failed';
       setError(errorMessage);
@@ -92,9 +102,17 @@ export const useAuth = () => {
     try {
       setError(null);
       setLoading(true);
-
       await signInWithEmailAndPassword(auth, email, password);
-      // User data will be fetched by onAuthStateChanged listener
+      
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data() as User;
+          setUser(userData);
+          router.replace('/(app)');
+        }
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Sign in failed';
       setError(errorMessage);
@@ -111,6 +129,7 @@ export const useAuth = () => {
       await signOut(auth);
       setUser(null);
       await userStorage.clear();
+      router.replace('/(auth)/login');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Logout failed';
       setError(errorMessage);
