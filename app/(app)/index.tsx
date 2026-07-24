@@ -1,92 +1,166 @@
 /**
- * GoodJob - Home Screen
- * Pantalla principal de la app (autenticada)
+ * GoodJob - Improved Home Screen
+ * Basado en referencia GoodJobs
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
+  StyleSheet,
   TouchableOpacity,
+  TextInput,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-
 import { useAuth } from '../../src/utils/useAuth';
-
 import { CustomButton, colors, spacing } from '../../src/components/common';
+import { workerService, categoryService } from '../../src/data/firestore';
+import { Worker, Category } from '../../src/types';
+import CategoryCard from '../../src/components/Categorycard';
+import WorkerCard from '../../src/components/Workercard';
 
 export default function HomeScreen() {
-  const router = useRouter();
-  const { user, logout, loading } = useAuth();
+  const { user, logout } = useAuth();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [workers, setWorkers] = useState<Worker[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [workersData, categoriesData] = await Promise.all([
+        workerService.getAvailable(10),
+        categoryService.getAll(),
+      ]);
+      setWorkers(workersData);
+      setCategories(categoriesData);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogout = async () => {
     try {
       await logout();
-      // Navigation happens automatically via useAuth hook
     } catch (error) {
       console.error('Logout error:', error);
     }
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>¡Hola, {user?.firstName}!</Text>
-          <Text style={styles.subgreeting}>
-            Bienvenido a GoodJob
-          </Text>
+          <Text style={styles.logo}>JOB</Text>
+          <Text style={styles.companyName}>GoodJob</Text>
+        </View>
+        <TouchableOpacity style={styles.settingsBtn} onPress={handleLogout}>
+          <Text style={styles.settingsIcon}>⚙️</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Location */}
+      <View style={styles.locationContainer}>
+        <Text style={styles.locationLabel}>Tu ubicación</Text>
+        <View style={styles.locationContent}>
+          <Text style={styles.locationIcon}>📍</Text>
+          <Text style={styles.locationText}>Madrid, España</Text>
+          <TouchableOpacity style={styles.editLocationBtn}>
+            <Text style={styles.editIcon}>✏️</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* User Info Card */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Información de Perfil</Text>
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Nombre:</Text>
-          <Text style={styles.value}>
-            {user?.firstName} {user?.lastName}
-          </Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Email:</Text>
-          <Text style={styles.value}>{user?.email}</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Teléfono:</Text>
-          <Text style={styles.value}>{user?.phone}</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Rol:</Text>
-          <Text style={styles.value}>
-            {user?.role === 'employer'
-              ? 'Empleador'
-              : user?.role === 'worker'
-              ? 'Trabajador'
-              : 'Ambos'}
-          </Text>
-        </View>
+      {/* Search Input */}
+      <View style={styles.searchContainer}>
+        <Text style={styles.searchIcon}>✨</Text>
+        <TextInput
+          placeholder="Describe your problem..."
+          placeholderTextColor={colors.textLight}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          style={styles.searchInput}
+        />
+        <TouchableOpacity style={styles.cameraBtn}>
+          <Text>📷</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.micBtn}>
+          <Text>🎤</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Features Coming Soon */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Próximas Características</Text>
-        <FeatureItem text="🔍 Buscar trabajadores" />
-        <FeatureItem text="💼 Mis reservas" />
-        <FeatureItem text="💬 Mensajes" />
-        <FeatureItem text="⭐ Reseñas" />
+      {/* Quick Tags */}
+      <View style={styles.quickTagsContainer}>
+        <TouchableOpacity style={styles.quickTag}>
+          <Text style={styles.quickTagText}>No hay agua 💧</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.quickTag}>
+          <Text style={styles.quickTagText}>Problema eléctrico ⚡</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.quickTag}>
+          <Text style={styles.quickTagText}>Nec...</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Categories Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Soluciones rápidas</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.categoriesScroll}
+        >
+          {categories.slice(0, 5).map((category, index) => (
+            <CategoryCard
+              key={category.id}
+              icon={getCategoryIcon(category.name)}
+              label={category.name}
+              isNew={index === 1}
+              onPress={() => {}}
+            />
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* Recommended Workers Section */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Profesionales recomendados para ti</Text>
+          <TouchableOpacity>
+            <Text style={styles.seeAllLink}>Ver todos</Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.workersScroll}
+        >
+          {workers.map((worker) => (
+            <WorkerCard
+              key={worker.id}
+              name={worker.userNameSnapshot}
+              title={`${worker.yearsExperience} años experiencia`}
+              rating={worker.avgRating}
+              distance={1.2}
+              onPress={() => {}}
+            />
+          ))}
+        </ScrollView>
       </View>
 
       {/* Logout Button */}
       <View style={styles.footer}>
         <CustomButton
-          title={loading ? 'Cerrando sesión...' : 'Cerrar Sesión'}
+          title="Cerrar Sesión"
           onPress={handleLogout}
-          loading={loading}
-          disabled={loading}
           variant="danger"
           size="large"
         />
@@ -95,101 +169,199 @@ export default function HomeScreen() {
   );
 }
 
-// ============================================================================
-// Feature Item Component
-// ============================================================================
-
-interface FeatureItemProps {
-  text: string;
-}
-
-const FeatureItem: React.FC<FeatureItemProps> = ({ text }) => {
-  return (
-    <View style={styles.featureItem}>
-      <Text style={styles.featureText}>{text}</Text>
-    </View>
-  );
+// Helper function to get category icons
+const getCategoryIcon = (categoryName: string): string => {
+  const icons: { [key: string]: string } = {
+    'Fontanería': '🔧',
+    'Limpieza': '🧹',
+    'Jardinería': '🌿',
+    'Electricidad': '⚡',
+    'Carpintería': '🪵',
+    'Plomería': '🚰',
+    'Pintura': '🎨',
+  };
+  return icons[categoryName] || '🛠️';
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.gray,
+    backgroundColor: colors.primary,
   },
 
   // Header
   header: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.xl,
-    paddingTop: spacing.xl + 20, // Safe area
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  greeting: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.secondary,
-    marginBottom: spacing.sm,
-  },
-  subgreeting: {
-    fontSize: 14,
-    color: colors.secondary,
-    opacity: 0.8,
-  },
-
-  // Cards
-  card: {
-    backgroundColor: colors.secondary,
-    marginHorizontal: spacing.lg,
-    marginVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    paddingTop: spacing.xl,
   },
-  cardTitle: {
+
+  logo: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: colors.secondary,
+    letterSpacing: 2,
+  },
+
+  companyName: {
     fontSize: 16,
     fontWeight: '600',
+    color: colors.secondary,
+  },
+
+  settingsBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#2a2a2a',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  settingsIcon: {
+    fontSize: 20,
+  },
+
+  // Location
+  locationContainer: {
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+
+  locationLabel: {
+    fontSize: 12,
+    color: colors.textLight,
+    marginBottom: spacing.sm,
+  },
+
+  locationContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+  },
+
+  locationIcon: {
+    fontSize: 16,
+    marginRight: spacing.md,
+  },
+
+  locationText: {
+    flex: 1,
+    color: colors.secondary,
+    fontWeight: '500',
+  },
+
+  editLocationBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#1abc9c',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  editIcon: {
+    fontSize: 14,
+  },
+
+  // Search
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+    backgroundColor: colors.secondary,
+    borderRadius: 16,
+    paddingVertical: spacing.sm,
+  },
+
+  searchIcon: {
+    fontSize: 16,
+    marginRight: spacing.md,
+  },
+
+  searchInput: {
+    flex: 1,
     color: colors.text,
+    fontSize: 14,
+    paddingVertical: spacing.md,
+  },
+
+  cameraBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: spacing.sm,
+  },
+
+  micBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#1abc9c',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Quick Tags
+  quickTagsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+    gap: spacing.md,
+  },
+
+  quickTag: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.secondary,
+    borderRadius: 20,
+  },
+
+  quickTagText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+
+  // Sections
+  section: {
+    marginBottom: spacing.xl,
+  },
+
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
     marginBottom: spacing.md,
   },
 
-  // Info Row
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.secondary,
   },
-  label: {
-    fontSize: 14,
-    color: colors.textLight,
-    fontWeight: '500',
-  },
-  value: {
-    fontSize: 14,
-    color: colors.text,
+
+  seeAllLink: {
+    color: '#1abc9c',
+    fontSize: 12,
     fontWeight: '600',
   },
 
-  // Feature Item
-  featureItem: {
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+  categoriesScroll: {
+    paddingLeft: spacing.lg,
   },
-  featureText: {
-    fontSize: 14,
-    color: colors.text,
-    fontWeight: '500',
+
+  workersScroll: {
+    paddingLeft: spacing.lg,
   },
 
   // Footer
