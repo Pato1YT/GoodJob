@@ -1,5 +1,5 @@
 /**
- * GoodJob - Common UI Components
+ * GoodJob - Common UI Components (CON LUCIDE ICONS)
  * Componentes reutilizables para toda la app
  */
 
@@ -12,22 +12,45 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
+import {
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  Check,
+  AlertCircle,
+  CheckCircle,
+  Phone,
+  User,
+  Settings,
+  LogOut,
+  Search,
+  MapPin,
+  Star,
+  Wrench,
+  Zap,
+  Wind,
+  Leaf,
+  Hammer,
+  Paintbrush,
+  Snowflake,
+} from 'lucide-react-native';
 
 // ============================================================================
 // COLORES Y ESTILOS GLOBALES
 // ============================================================================
 
 export const colors = {
-  primary: '#000000',      // Negro (del logo)
-  secondary: '#FFFFFF',    // Blanco
-  accent: '#0066FF',       // Azul (acentos)
-  danger: '#FF3B30',       // Rojo
-  success: '#34C759',      // Verde
-  gray: '#F2F2F7',         // Gris claro
-  darkGray: '#8E8E93',     // Gris oscuro
-  border: '#E5E5EA',       // Borde gris
-  text: '#000000',         // Texto negro
-  textLight: '#8E8E93',    // Texto gris
+  primary: '#000000',
+  secondary: '#FFFFFF',
+  accent: '#0066FF',
+  danger: '#FF3B30',
+  success: '#34C759',
+  gray: '#F2F2F7',
+  darkGray: '#8E8E93',
+  border: '#E5E5EA',
+  text: '#000000',
+  textLight: '#8E8E93',
 };
 
 export const spacing = {
@@ -46,7 +69,44 @@ export const borderRadius = {
 };
 
 // ============================================================================
-// CUSTOM INPUT
+// ICON MAP - Mapear nombres a componentes
+// ============================================================================
+
+const iconMap: { [key: string]: React.ComponentType<any> } = {
+  email: Mail,
+  lock: Lock,
+  'lock-check': Lock,
+  eye: Eye,
+  'eye-off': EyeOff,
+  check: Check,
+  'check-circle': CheckCircle,
+  'alert-circle': AlertCircle,
+  phone: Phone,
+  account: User,
+  settings: Settings,
+  cog: Settings,
+  logout: LogOut,
+  search: Search,
+  magnify: Search,
+  'map-marker': MapPin,
+  star: Star,
+  'pipe': Wrench,
+  'lightning-bolt': Zap,
+  'broom': Wind,
+  leaf: Leaf,
+  hammer: Hammer,
+  'paint-brush': Paintbrush,
+  snowflake: Snowflake,
+  'account-plus': User,
+};
+
+const getIconComponent = (iconName?: string) => {
+  if (!iconName) return null;
+  return iconMap[iconName] || User;
+};
+
+// ============================================================================
+// CUSTOM INPUT CON ICONOS
 // ============================================================================
 
 interface CustomInputProps {
@@ -56,8 +116,9 @@ interface CustomInputProps {
   secureTextEntry?: boolean;
   keyboardType?: 'default' | 'email-address' | 'numeric' | 'phone-pad';
   editable?: boolean;
+  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   error?: string;
-  icon?: React.ReactNode;
+  icon?: string;
 }
 
 export const CustomInput = React.forwardRef<TextInput, CustomInputProps>(
@@ -68,33 +129,48 @@ export const CustomInput = React.forwardRef<TextInput, CustomInputProps>(
       onChangeText,
       secureTextEntry,
       keyboardType = 'default',
+      autoCapitalize = 'sentences',
       editable = true,
       error,
       icon,
     },
     ref
   ) => {
+    const [showPassword, setShowPassword] = React.useState(!secureTextEntry);
+    const IconComponent = getIconComponent(icon);
+
     return (
       <View style={styles.inputContainer}>
-        <View style={[
-            styles.inputWrapper,
-            error ? styles.inputError : undefined,
-        ]}>
-          {icon && <View style={styles.inputIcon}>{icon}</View>}
+        <View style={[styles.inputWrapper, error ? styles.inputError : undefined]}>
+          {IconComponent && (
+            <View style={styles.inputIcon}>
+              <IconComponent size={20} color={colors.textLight} strokeWidth={2} />
+            </View>
+          )}
           <TextInput
             ref={ref}
             placeholder={placeholder}
             value={value}
             onChangeText={onChangeText}
-            secureTextEntry={secureTextEntry}
+            secureTextEntry={secureTextEntry && !showPassword}
             keyboardType={keyboardType}
             editable={editable}
+            autoCapitalize={autoCapitalize}
             placeholderTextColor={colors.textLight}
-            style={[
-                styles.input,
-                icon ? styles.inputWithIcon : undefined,
-            ]}
+            style={[styles.input, icon ? styles.inputWithIcon : undefined]}
           />
+          {secureTextEntry && (
+            <TouchableOpacity
+              onPress={() => setShowPassword(!showPassword)}
+              hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+            >
+              {showPassword ? (
+                <Eye size={20} color={colors.textLight} strokeWidth={2} />
+              ) : (
+                <EyeOff size={20} color={colors.textLight} strokeWidth={2} />
+              )}
+            </TouchableOpacity>
+          )}
         </View>
         {error && <Text style={styles.errorText}>{error}</Text>}
       </View>
@@ -105,7 +181,7 @@ export const CustomInput = React.forwardRef<TextInput, CustomInputProps>(
 CustomInput.displayName = 'CustomInput';
 
 // ============================================================================
-// CUSTOM BUTTON
+// CUSTOM BUTTON CON ÍCONO OPCIONAL
 // ============================================================================
 
 interface CustomButtonProps {
@@ -115,6 +191,7 @@ interface CustomButtonProps {
   disabled?: boolean;
   variant?: 'primary' | 'secondary' | 'danger';
   size?: 'small' | 'medium' | 'large';
+  icon?: string;
 }
 
 export const CustomButton: React.FC<CustomButtonProps> = ({
@@ -124,8 +201,11 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
   disabled = false,
   variant = 'primary',
   size = 'medium',
+  icon,
 }) => {
   const isDisabled = disabled || loading;
+  const IconComponent = getIconComponent(icon);
+  const iconColor = variant === 'secondary' ? colors.primary : colors.secondary;
 
   return (
     <TouchableOpacity
@@ -144,39 +224,60 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
           color={variant === 'secondary' ? colors.primary : colors.secondary}
         />
       ) : (
-        <Text
-          style={[
-            styles.buttonText,
-            styles[`buttonText_${variant}`],
-            styles[`buttonText_${size}`],
-          ]}
-        >
-          {title}
-        </Text>
+        <View style={styles.buttonContent}>
+          {IconComponent && (
+            <IconComponent
+              size={18}
+              color={iconColor}
+              strokeWidth={2}
+              style={styles.buttonIcon}
+            />
+          )}
+          <Text
+            style={[
+              styles.buttonText,
+              styles[`buttonText_${variant}`],
+              styles[`buttonText_${size}`],
+            ]}
+          >
+            {title}
+          </Text>
+        </View>
       )}
     </TouchableOpacity>
   );
 };
 
 // ============================================================================
-// CUSTOM LINK BUTTON
+// CUSTOM LINK BUTTON CON ÍCONO
 // ============================================================================
 
 interface LinkButtonProps {
   text: string;
   onPress: () => void;
+  icon?: string;
 }
 
-export const LinkButton: React.FC<LinkButtonProps> = ({ text, onPress }) => {
+export const LinkButton: React.FC<LinkButtonProps> = ({ text, onPress, icon }) => {
+  const IconComponent = getIconComponent(icon);
+
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.linkContainer}>
+      {IconComponent && (
+        <IconComponent
+          size={14}
+          color={colors.accent}
+          strokeWidth={2}
+          style={styles.linkIcon}
+        />
+      )}
       <Text style={styles.linkText}>{text}</Text>
     </TouchableOpacity>
   );
 };
 
 // ============================================================================
-// ERROR MESSAGE
+// ERROR MESSAGE CON ÍCONO
 // ============================================================================
 
 interface ErrorMessageProps {
@@ -192,9 +293,18 @@ export const ErrorMessage: React.FC<ErrorMessageProps> = ({
 
   return (
     <View style={styles.errorContainer}>
+      <AlertCircle
+        size={20}
+        color={colors.danger}
+        strokeWidth={2}
+        style={styles.errorIcon}
+      />
       <Text style={styles.errorMessage}>{message}</Text>
       {onDismiss && (
-        <TouchableOpacity onPress={onDismiss} hitSlop={{ top: 10, right: 10 }}>
+        <TouchableOpacity
+          onPress={onDismiss}
+          hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+        >
           <Text style={styles.errorDismiss}>✕</Text>
         </TouchableOpacity>
       )}
@@ -203,7 +313,7 @@ export const ErrorMessage: React.FC<ErrorMessageProps> = ({
 };
 
 // ============================================================================
-// SUCCESS MESSAGE
+// SUCCESS MESSAGE CON ÍCONO
 // ============================================================================
 
 interface SuccessMessageProps {
@@ -215,6 +325,12 @@ export const SuccessMessage: React.FC<SuccessMessageProps> = ({ message }) => {
 
   return (
     <View style={styles.successContainer}>
+      <CheckCircle
+        size={20}
+        color={colors.success}
+        strokeWidth={2}
+        style={styles.successIcon}
+      />
       <Text style={styles.successMessage}>{message}</Text>
     </View>
   );
@@ -226,6 +342,36 @@ export const SuccessMessage: React.FC<SuccessMessageProps> = ({ message }) => {
 
 export const Divider: React.FC = () => {
   return <View style={styles.divider} />;
+};
+
+// ============================================================================
+// RATING STARS CON ICONOS
+// ============================================================================
+
+interface RatingStarsProps {
+  rating: number;
+  size?: number;
+  color?: string;
+}
+
+export const RatingStars: React.FC<RatingStarsProps> = ({
+  rating,
+  size = 16,
+  color = '#FFB800',
+}) => {
+  return (
+    <View style={styles.ratingContainer}>
+      {[1, 2, 3, 4, 5].map((star) => (
+        <Star
+          key={star}
+          size={size}
+          color={color}
+          fill={star <= Math.round(rating) ? color : 'none'}
+          strokeWidth={2}
+        />
+      ))}
+    </View>
+  );
 };
 
 // ============================================================================
@@ -277,6 +423,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginVertical: spacing.sm,
   },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonIcon: {
+    marginRight: spacing.sm,
+  },
   button_primary: {
     backgroundColor: colors.primary,
   },
@@ -327,6 +481,13 @@ const styles = StyleSheet.create({
   },
 
   // Link button
+  linkContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  linkIcon: {
+    marginRight: spacing.xs,
+  },
   linkText: {
     color: colors.accent,
     fontSize: 14,
@@ -338,7 +499,6 @@ const styles = StyleSheet.create({
   errorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     marginVertical: spacing.md,
@@ -346,6 +506,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFE5E5',
     borderLeftWidth: 4,
     borderLeftColor: colors.danger,
+  },
+  errorIcon: {
+    marginRight: spacing.md,
   },
   errorMessage: {
     color: colors.danger,
@@ -361,6 +524,8 @@ const styles = StyleSheet.create({
 
   // Success message
   successContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     marginVertical: spacing.md,
@@ -369,10 +534,14 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: colors.success,
   },
+  successIcon: {
+    marginRight: spacing.md,
+  },
   successMessage: {
     color: colors.success,
     fontSize: 14,
     fontWeight: '500',
+    flex: 1,
   },
 
   // Divider
@@ -380,6 +549,12 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: colors.border,
     marginVertical: spacing.lg,
+  },
+
+  // Rating
+  ratingContainer: {
+    flexDirection: 'row',
+    gap: spacing.xs,
   },
 });
 
@@ -392,5 +567,6 @@ export default {
   LinkButton,
   ErrorMessage,
   SuccessMessage,
+  RatingStars,
   Divider,
 };

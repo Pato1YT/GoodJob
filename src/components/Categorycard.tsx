@@ -1,6 +1,15 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, View } from 'react-native';
 import { colors, spacing } from './common';
+import {
+  Wrench,
+  Zap,
+  Wind,
+  Leaf,
+  Hammer,
+  Paintbrush,
+  Snowflake,
+} from 'lucide-react-native';
 
 interface CategoryCardProps {
   icon: string;
@@ -8,6 +17,17 @@ interface CategoryCardProps {
   isNew?: boolean;
   onPress: () => void;
 }
+
+// Mapear nombres de iconos a componentes de Lucide
+const iconMap: { [key: string]: React.ReactNode } = {
+  pipe: <Wrench size={32} color={colors.text} strokeWidth={2} />,
+  'lightning-bolt': <Zap size={32} color={colors.text} strokeWidth={2} />,
+  broom: <Wind size={32} color={colors.text} strokeWidth={2} />,
+  leaf: <Leaf size={32} color={colors.text} strokeWidth={2} />,
+  hammer: <Hammer size={32} color={colors.text} strokeWidth={2} />,
+  'paint-brush': <Paintbrush size={32} color={colors.text} strokeWidth={2} />,
+  snowflake: <Snowflake size={32} color={colors.text} strokeWidth={2} />,
+};
 
 export const CategoryCard: React.FC<CategoryCardProps> = ({
   icon,
@@ -22,7 +42,9 @@ export const CategoryCard: React.FC<CategoryCardProps> = ({
       activeOpacity={0.7}
     >
       {isNew && <Text style={styles.badge}>NUEVO</Text>}
-      <Text style={styles.icon}>{icon}</Text>
+      <View style={styles.iconContainer}>
+        {iconMap[icon] || iconMap.pipe}
+      </View>
       <Text style={styles.label}>{label}</Text>
     </TouchableOpacity>
   );
@@ -53,8 +75,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
   },
-  icon: {
-    fontSize: 32,
+  iconContainer: {
     marginBottom: spacing.sm,
   },
   label: {
