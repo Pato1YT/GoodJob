@@ -159,7 +159,7 @@ export default function LoginScreen() {
             {/* Forgot password */}
             <LinkButton
               text="¿Olvidaste tu contraseña?"
-              onPress={handleForgotPassword}
+              onPress={() => router.push('/forgot-password')}
             />
           </View>
         </View>

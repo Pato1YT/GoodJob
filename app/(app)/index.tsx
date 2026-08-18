@@ -21,7 +21,7 @@ import { workerService, categoryService } from '../../src/data/firestore';
 import { Worker, Category } from '../../src/types';
 import CategoryCard from '../../src/components/Categorycard';
 import WorkerCard from '../../src/components/Workercard';
-import { Settings, LogOut, MapPin, Search, Edit2, Mic, Camera } from 'lucide-react';
+import { Settings, LogOut, MapPin, Search, Edit2, Mic, Camera } from 'lucide-react-native';
 
 export default function HomeScreen() {
   const { user, logout } = useAuth();

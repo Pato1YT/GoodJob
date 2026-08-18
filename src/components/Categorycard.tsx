@@ -9,7 +9,7 @@ import {
   Hammer,
   Paintbrush,
   Snowflake,
-} from 'lucide-react';
+} from 'lucide-react-native';
 
 interface CategoryCardProps {
   icon: string;

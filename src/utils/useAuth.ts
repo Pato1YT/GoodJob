@@ -12,6 +12,7 @@ import { auth, db } from '../config/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { User } from '../types';
 import { userStorage } from '../utils/storage';
+import { sendPasswordResetEmail } from 'firebase/auth';
 
 interface AuthContextType {
   user: User | null;
@@ -21,6 +22,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
+  resetPassword : (email : string) => Promise<void>;
 }
 
 export const useAuth = () => {
@@ -28,6 +30,8 @@ export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+
 
   // Listen to auth state changes
   useEffect(() => {
@@ -139,6 +143,22 @@ export const useAuth = () => {
     }
   };
 
+  const resetPassword = async (email: string): Promise<void> => {
+    try {
+
+      await sendPasswordResetEmail(auth, email);
+      console.log('Email de reset enviado a:', email);
+    }catch(error: any){
+      if(error.code === 'auth/user-not-found') {
+        throw new Error('No hay una cuenta asociada');
+      }else if(error.code === 'auth/invalid-email') {
+        throw new Error('Email invalido');
+      }else {
+        throw new Error(error.message || 'Error al enviar el correo');
+      }
+    }
+  }
+
   const clearError = () => setError(null);
 
   return {
@@ -149,5 +169,6 @@ export const useAuth = () => {
     signIn,
     logout,
     clearError,
+    resetPassword,
   } as AuthContextType;
 };
