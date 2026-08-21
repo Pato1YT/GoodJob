@@ -1,138 +1,98 @@
-/**
- * GoodJob - Improved Home Screen (Mejorado)
- * Pantalla principal con geolocalización y búsqueda funcional
- */
-
-import React, { useState, useEffect } from 'react';
+// pantalla principal de Good Job
+import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
   StyleSheet,
-  TouchableOpacity,
+  Text,
+  View,
+  ScrollView,
   TextInput,
-  ActivityIndicator,
-  RefreshControl,
+  TouchableOpacity,
+  Image,
+  StatusBar,
+  Platform,
 } from 'react-native';
-import { useAuth } from '../../src/utils/useAuth';
-import { useRouter } from 'expo-router';
-import { CustomButton, colors, spacing } from '../../src/components/common';
-import { workerService, categoryService } from '../../src/data/firestore';
-import { Worker, Category } from '../../src/types';
-import CategoryCard from '../../src/components/Categorycard';
-import WorkerCard from '../../src/components/Workercard';
-import { Settings, LogOut, MapPin, Search, Edit2, Mic, Camera } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+
+// --- Paleta de colores Monochrome Premium ---
+const COLORS = {
+  background: '#F9F9FB',
+  surface: '#FFFFFF',
+  surfaceLow: '#F3F3F5',
+  surfaceVariant: '#E2E2E4',
+  textPrimary: '#1A1C1D',
+  textSecondary: '#4C4546',
+  primary: '#000000',
+  onPrimary: '#FFFFFF',
+  error: '#BA1A1A',
+};
+
+// --- Tipos de Datos ---
+interface Category {
+  id: string;
+  name: string;
+  iconName: string;
+  iconFamily: 'MaterialIcons' | 'MaterialCommunityIcons' | 'Ionicons';
+  isNew?: boolean;
+}
+
+interface Professional {
+  id: string;
+  name: string;
+  category: string;
+  rating: number;
+  distance: string;
+  price: string;
+  experience: string;
+  imageUrl: string;
+}
+
+// --- Datos Falsos (Mock Data) ---
+const CATEGORIES: Category[] = [
+  { id: '1', name: 'Fontanería', iconName: 'plumbing', iconFamily: 'MaterialIcons' },
+  { id: '2', name: 'Limpieza', iconName: 'cleaning-services', iconFamily: 'MaterialIcons', isNew: true },
+  { id: '3', name: 'Jardinería', iconName: 'grass', iconFamily: 'MaterialIcons' },
+  { id: '4', name: 'Electricidad', iconName: 'electrical-services', iconFamily: 'MaterialIcons' },
+];
+
+const PROFESSIONALS: Professional[] = [
+  {
+    id: '1',
+    name: 'Carlos Rodríguez',
+    category: 'Fontanero Profesional',
+    rating: 4.8,
+    distance: '1.2 km',
+    price: 'Desde $30/h',
+    experience: '8 años',
+    imageUrl:
+      'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=400',
+  },
+  {
+    id: '2',
+    name: 'María González',
+    category: 'Servicio de Limpieza',
+    rating: 4.9,
+    distance: '0.8 km',
+    price: 'Desde $25/h',
+    experience: '12 años',
+    imageUrl:
+      'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400',
+  },
+];
 
 export default function HomeScreen() {
-  const { user, logout } = useAuth();
-  const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [workers, setWorkers] = useState<Worker[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [problemText, setProblemText] = useState('');
 
-  // NUEVO: Geolocalización
-  const [location, setLocation] = useState<{
-    latitude: number;
-    longitude: number;
-    cityName: string;
-  } | null>(null);
-
-  useEffect(() => {
-    initializeScreen();
-  }, []);
-
-  const initializeScreen = async () => {
-    try {
-      setLoading(true);
-      // NUEVO: Pedir ubicación
-      // await requestLocationPermission();
-      await loadData();
-    } catch (error) {
-      console.error('Error initializing screen:', error);
-      setError('Error al cargar datos');
-    } finally {
-      setLoading(false);
+  const renderCategoryIcon = (category: Category) => {
+    const color = COLORS.primary;
+    const size = 26;
+    if (category.iconFamily === 'MaterialIcons') {
+      return <MaterialIcons name={category.iconName as any} size={size} color={color} />;
     }
-  };
-
-  // NUEVO: Función de geolocalización
-  // const requestLocationPermission = async () => {
-  //   try {
-  //     const { status } = await Location.requestForegroundPermissionsAsync();
-  //     if (status === 'granted') {
-  //       const currentLocation = await Location.getCurrentPositionAsync({
-  //         accuracy: Location.Accuracy.High,
-  //       });
-  //       setLocation({
-  //         latitude: currentLocation.coords.latitude,
-  //         longitude: currentLocation.coords.longitude,
-  //         cityName: 'Tu ubicación', // TODO: reverse geocode
-  //       });
-  //     }
-  //   } catch (error) {
-  //     console.error('Error requesting location:', error);
-  //     // Fallback a ubicación por defecto
-  //     setLocation({
-  //       latitude: 25.6867, // Iguala
-  //       longitude: -99.7530,
-  //       cityName: 'Iguala, Guerrero',
-  //     });
-  //   }
-  // };
-
-  const loadData = async () => {
-    try {
-      setError(null);
-      const [workersData, categoriesData] = await Promise.all([
-        workerService.getAvailable(10),
-        categoryService.getAll(),
-      ]);
-      setWorkers(workersData);
-      setCategories(categoriesData);
-    } catch (error) {
-      console.error('Error loading data:', error);
-      setError('No se pudieron cargar los datos');
+    if (category.iconFamily === 'MaterialCommunityIcons') {
+      return <MaterialCommunityIcons name={category.iconName as any} size={size} color={color} />;
     }
-  };
-
-  // NUEVO: Pull to refresh
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    try {
-      await loadData();
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  // NUEVO: Handle search
-  const handleSearch = () => {
-    if (searchQuery.trim()) {
-      // Navegar a SearchScreen con query
-      router.push({
-        pathname: '/search',
-        params: { query: searchQuery },
-      });
-    }
-  };
-
-  // NUEVO: Handle quick tags
-  const handleQuickTag = (tagName: string) => {
-    setSearchQuery(tagName);
-    // Podría filtrar localmente o navegar a search
-  };
-
-  // NUEVO: Handle logout
-  const handleLogout = async () => {
-    try {
-      await logout();
-      router.replace('/login');
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
+    return <Ionicons name={category.iconName as any} size={size} color={color} />;
   };
 
   // NUEVO: Navigate to settings
@@ -149,421 +109,420 @@ export default function HomeScreen() {
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-      }
-    >
-      {/* Header */}
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+
+      {/* --- Top App Bar --- */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.logo}>JOB</Text>
-          <Text style={styles.companyName}>GoodJob</Text>
+        <View style={styles.logoContainer}>
+          <MaterialIcons name="work" size={28} color={COLORS.primary} />
+          <Text style={styles.logoText}>GoodJobs</Text>
         </View>
-        <TouchableOpacity
-          style={styles.settingsBtn}
-          onPress={handleSettings}
-        >
-          <Settings size={24} color={colors.secondary} strokeWidth={2} />
+        <TouchableOpacity style={styles.iconButton} activeOpacity={0.7}>
+          <Ionicons name="settings-outline" size={22} color={COLORS.primary} />
         </TouchableOpacity>
       </View>
 
-      {/* Location - MEJORADO */}
-      <View style={styles.locationContainer}>
-        <Text style={styles.locationLabel}>Tu ubicación</Text>
-        <View style={styles.locationContent}>
-          <MapPin size={20} color={colors.secondary} strokeWidth={2} />
-          <Text style={styles.locationText}>
-            {location?.cityName || 'Cargando ubicación...'}
-          </Text>
-          <TouchableOpacity style={styles.editLocationBtn}>
-            <Edit2 size={16} color={colors.primary} strokeWidth={2} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Search Input - MEJORADO */}
-      <View style={styles.searchContainer}>
-        <Search size={20} color={colors.text} strokeWidth={2} />
-        <TextInput
-          placeholder="Describe your problem..."
-          placeholderTextColor={colors.textLight}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          onSubmitEditing={handleSearch}
-          style={styles.searchInput}
-        />
-        
-        <TouchableOpacity style={styles.cameraBtn}>
-            <Camera size={20} color={colors.text} strokeWidth={2} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.micBtn}
-          onPress={handleSearch}
-        >
-          <Mic size={20} color={colors.secondary} strokeWidth={2} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Quick Tags - MEJORADO */}
-      <View style={styles.quickTagsContainer}>
-        <TouchableOpacity
-          style={styles.quickTag}
-          onPress={() => handleQuickTag('No hay agua 💧')}
-        >
-          <Text style={styles.quickTagText}>No hay agua 💧</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.quickTag}
-          onPress={() => handleQuickTag('Problema eléctrico ⚡')}
-        >
-          <Text style={styles.quickTagText}>Problema eléctrico ⚡</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.quickTag}>
-          <Text style={styles.quickTagText}>Más...</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Error State - NUEVO */}
-      {error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-          <CustomButton
-            title="Reintentar"
-            onPress={handleRefresh}
-            size="small"
-          />
-        </View>
-      )}
-
-      {/* Categories Section */}
-      {categories.length > 0 ? (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Soluciones rápidas</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.categoriesScroll}
-          >
-            {categories.slice(0, 5).map((category, index) => (
-            <CategoryCard
-                key={category.id}
-                icon={getCategoryIcon(category.name)}
-                label={category.name}
-                isNew={index === 1}
-                onPress={() => {
-                  router.push({
-                    pathname: '/search',
-                    params: { categoryId: category.id },
-                  });
-                }}
-              />
-            ))}
-          </ScrollView>
-        </View>
-      ) : null}
-
-      {/* Recommended Workers Section - MEJORADO */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Profesionales recomendados</Text>
-          <TouchableOpacity onPress={() => router.push('/search')}>
-            <Text style={styles.seeAllLink}>Ver todos</Text>
-          </TouchableOpacity>
-        </View>
-
-        {workers.length > 0 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.workersScroll}
-          >
-            {workers.map((worker) => (
-              <WorkerCard
-                key={worker.id}
-                name={worker.userNameSnapshot}
-                title={`${worker.yearsExperience} años experiencia`}
-                rating={worker.avgRating}
-                distance={1.2} // TODO: Calcular distancia real
-                onPress={() => {
-                  router.push({
-                    pathname: '/worker-detail/[id]',
-                    params: { id: worker.id },
-                  });
-                }}
-              />
-            ))}
-          </ScrollView>
-        ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>
-              No hay trabajadores disponibles
-            </Text>
-            <Text style={styles.emptySubtitle}>
-              Intenta más tarde o ajusta tus filtros
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* --- Location Banner --- */}
+        <View style={styles.locationCard}>
+          <Ionicons name="location" size={22} color={COLORS.primary} style={styles.locationIcon} />
+          <View style={styles.locationInfo}>
+            <Text style={styles.locationLabel}>Tu ubicación</Text>
+            <Text style={styles.locationValue} numberOfLines={1}>
+              Av. de la Castellana 95, Madrid, España
             </Text>
           </View>
-        )}
-      </View>
+          <TouchableOpacity style={styles.editButton} activeOpacity={0.7}>
+            <Ionicons name="pencil" size={14} color={COLORS.primary} />
+          </TouchableOpacity>
+        </View>
 
-      {/* Footer - MEJORADO */}
-      <View style={styles.footer}>
-        <CustomButton
-          title="Cerrar Sesión"
-          icon="logout"
-          onPress={handleLogout}
-          //variant="outline"
-          size="large"
-        />
-      </View>
-    </ScrollView>
+        {/* --- AI Prompt Search Input --- */}
+        <View style={styles.aiCard}>
+          <MaterialIcons name="auto-awesome" size={22} color={COLORS.primary} />
+          <TextInput
+            style={styles.aiInput}
+            placeholder="Describe tu problema..."
+            placeholderTextColor={COLORS.textSecondary}
+            value={problemText}
+            onChangeText={setProblemText}
+            multiline={false}
+          />
+          <View style={styles.aiActions}>
+            <TouchableOpacity style={styles.cameraButton} activeOpacity={0.7}>
+              <Ionicons name="camera-outline" size={20} color={COLORS.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.micButton} activeOpacity={0.7}>
+              <Ionicons name="mic" size={20} color={COLORS.onPrimary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* --- Soluciones Rápidas (Categories) --- */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Soluciones rápidas</Text>
+          <View style={styles.categoriesGrid}>
+            {CATEGORIES.map((cat) => (
+              <TouchableOpacity
+                key={cat.id}
+                style={styles.categoryItem}
+                activeOpacity={0.8}
+              >
+                <View style={styles.categoryIconContainer}>
+                  {cat.isNew && (
+                    <View style={styles.newBadge}>
+                      <Text style={styles.newBadgeText}>NUEVO</Text>
+                    </View>
+                  )}
+                  {renderCategoryIcon(cat)}
+                </View>
+                <Text style={styles.categoryName}>{cat.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* --- Profesionales Recomendados --- */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitleHeader}>
+              Profesionales recomendados para ti
+            </Text>
+            <TouchableOpacity activeOpacity={0.7}>
+              <Text style={styles.seeAllText}>Ver todos</Text>
+            </TouchableOpacity>
+          </View>
+
+          {PROFESSIONALS.map((pro) => (
+            <View key={pro.id} style={styles.proCard}>
+              <Image source={{ uri: pro.imageUrl }} style={styles.proImage} />
+              <View style={styles.proContent}>
+                <Text style={styles.proName}>{pro.name}</Text>
+                <Text style={styles.proCategory}>{pro.category}</Text>
+
+                <View style={styles.proRatingRow}>
+                  <View style={styles.ratingBadge}>
+                    <Ionicons name="star" size={14} color={COLORS.primary} />
+                    <Text style={styles.ratingText}>{pro.rating}</Text>
+                  </View>
+                  <Text style={styles.dotSeparator}>•</Text>
+                  <View style={styles.distanceBadge}>
+                    <Ionicons name="location-outline" size={14} color={COLORS.textSecondary} />
+                    <Text style={styles.distanceText}>{pro.distance}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.proDetailsRow}>
+                  <View style={styles.detailBox}>
+                    <Text style={styles.detailLabel}>PRECIO</Text>
+                    <Text style={styles.detailValue}>{pro.price}</Text>
+                  </View>
+                  <View style={styles.detailBox}>
+                    <Text style={styles.detailLabel}>EXPERIENCIA</Text>
+                    <Text style={styles.detailValue}>{pro.experience}</Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity style={styles.profileButton} activeOpacity={0.8}>
+                  <Text style={styles.profileButtonText}>Ver Perfil</Text>
+                  <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
-// Helper function
-const getCategoryIcon = (categoryName: string): string => {
-  const icons: { [key: string]: string } = {
-    'Plomería': 'pipe',
-    'Electricidad': 'lightning-bolt',
-    'Limpieza': 'broom',
-    'Jardinería': 'leaf',
-    'Carpintería': 'hammer',
-    'Pintura': 'paint-brush',
-    'Refrigeración': 'snowflake',
-  };
-  return icons[categoryName] || 'tools';
-};
-
+// --- Estilos ---
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: colors.primary,
+    backgroundColor: COLORS.background,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
-
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-  },
-
-  // Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
-    paddingTop: spacing.xl,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    backgroundColor: COLORS.background,
   },
-
-  logo: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: colors.secondary,
-    letterSpacing: 2,
-  },
-
-  companyName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.secondary,
-  },
-
-  settingsBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#2a2a2a',
+  logoContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 8,
+  },
+  logoText: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: COLORS.primary,
+    letterSpacing: -0.5,
+  },
+  iconButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: COLORS.surfaceLow,
+  },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 40,
   },
 
-  settingsIcon: {
-    fontSize: 20,
+  // Location Card
+  locationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surfaceLow,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 16,
   },
-
-  // Location
-  locationContainer: {
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
+  locationIcon: {
+    marginRight: 10,
   },
-
+  locationInfo: {
+    flex: 1,
+  },
   locationLabel: {
     fontSize: 12,
-    color: colors.textLight,
-    marginBottom: spacing.sm,
-  },
-
-  locationContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-  },
-
-  locationIcon: {
-    fontSize: 16,
-    marginRight: spacing.md,
-  },
-
-  locationText: {
-    flex: 1,
-    color: colors.secondary,
+    color: COLORS.textSecondary,
     fontWeight: '500',
   },
-
-  editLocationBtn: {
+  locationValue: {
+    fontSize: 14,
+    color: COLORS.textPrimary,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  editButton: {
     width: 32,
     height: 32,
-    borderRadius: 8,
-    backgroundColor: '#1abc9c',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  editIcon: {
-    fontSize: 14,
-  },
-
-  // Search
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
-    backgroundColor: colors.secondary,
     borderRadius: 16,
-    paddingVertical: spacing.sm,
-  },
-
-  searchIcon: {
-    fontSize: 16,
-    marginRight: spacing.md,
-  },
-
-  searchInput: {
-    flex: 1,
-    color: colors.text,
-    fontSize: 14,
-    paddingVertical: spacing.md,
-  },
-
-  cameraBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
+    backgroundColor: COLORS.surfaceVariant,
     justifyContent: 'center',
-    marginHorizontal: spacing.sm,
-  },
-
-  micBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: '#1abc9c',
     alignItems: 'center',
-    justifyContent: 'center',
   },
 
-  // Quick Tags
-  quickTagsContainer: {
+  // AI Prompt Bar
+  aiCard: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
-    gap: spacing.md,
-  },
-
-  quickTag: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.secondary,
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceVariant,
     borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 28,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 2,
   },
-
-  quickTagText: {
-    color: colors.text,
-    fontSize: 12,
-    fontWeight: '500',
+  aiInput: {
+    flex: 1,
+    fontSize: 16,
+    color: COLORS.textPrimary,
+    marginLeft: 10,
+    paddingVertical: 4,
   },
-
-  // Error
-  errorContainer: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    backgroundColor: '#ffebee',
-    borderRadius: 8,
+  aiActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-
-  errorText: {
-    color: '#c62828',
-    fontSize: 14,
-    marginBottom: spacing.md,
+  cameraButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: COLORS.surfaceLow,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  micButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   // Sections
   section: {
-    marginBottom: spacing.xl,
+    marginBottom: 28,
   },
-
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: COLORS.primary,
+    marginBottom: 16,
+    letterSpacing: -0.3,
+  },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.md,
+    alignItems: 'flex-start',
+    marginBottom: 16,
   },
-
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.secondary,
+  sectionTitleHeader: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: COLORS.primary,
+    maxWidth: '70%',
+    letterSpacing: -0.3,
   },
-
-  seeAllLink: {
-    color: '#1abc9c',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-
-  categoriesScroll: {
-    paddingLeft: spacing.lg,
-  },
-
-  workersScroll: {
-    paddingLeft: spacing.lg,
-  },
-
-  // Empty State
-  emptyState: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.xl,
-    alignItems: 'center',
-  },
-
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.secondary,
-    marginBottom: spacing.sm,
-  },
-
-  emptySubtitle: {
+  seeAllText: {
     fontSize: 14,
-    color: colors.textLight,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+
+  // Categories Grid
+  categoriesGrid: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  categoryItem: {
+    alignItems: 'center',
+    width: '22%',
+  },
+  categoryIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: COLORS.surfaceLow,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+    position: 'relative',
+  },
+  newBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: COLORS.error,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  newBadgeText: {
+    color: COLORS.onPrimary,
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  categoryName: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: COLORS.textPrimary,
     textAlign: 'center',
   },
 
-  // Footer
-  footer: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.xl,
+  // Professional Cards
+  proCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceVariant,
+    overflow: 'hidden',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 16,
+    elevation: 3,
+  },
+  proImage: {
+    width: '100%',
+    height: 180,
+    backgroundColor: COLORS.surfaceVariant,
+  },
+  proContent: {
+    padding: 20,
+  },
+  proName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  proCategory: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  proRatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  ratingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  ratingText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  dotSeparator: {
+    marginHorizontal: 8,
+    color: COLORS.surfaceVariant,
+  },
+  distanceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  distanceText: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+  },
+  proDetailsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 16,
+  },
+  detailBox: {
+    flex: 1,
+    backgroundColor: COLORS.surfaceLow,
+    borderRadius: 12,
+    padding: 10,
+  },
+  detailLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+    letterSpacing: 0.5,
+  },
+  detailValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginTop: 2,
+  },
+  profileButton: {
+    marginTop: 16,
+    height: 48,
+    backgroundColor: COLORS.surfaceLow,
+    borderRadius: 12,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+  },
+  profileButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.primary,
   },
 });
