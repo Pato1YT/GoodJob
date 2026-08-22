@@ -102,13 +102,21 @@ export const userService = {
 
 export const workerService = {
   // Obtener trabajadores disponibles
-  async getAvailable(limit_count: number = 20): Promise<Worker[]> {
+  /*async getAvailable(limit_count: number = 20): Promise<Worker[]> {
     try {
       const q = query(
         collection(db, 'workers'),
         where('available', '==', true),
         where('verified', '==', true),
         orderBy('avgRating', 'desc'),
+        limit(limit_count)
+      );*/
+
+    async getAvailable(limit_count: number = 20): Promise<Worker[]> {
+    try {
+      const q = query(
+        collection(db, 'workers'),
+        where('available', '==', true),
         limit(limit_count)
       );
 
@@ -123,6 +131,7 @@ export const workerService = {
       throw error;
     }
   },
+  
 
   // Obtener trabajador por ID
   async getById(workerId: string): Promise<Worker | null> {

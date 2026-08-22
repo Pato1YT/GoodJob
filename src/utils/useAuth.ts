@@ -12,6 +12,7 @@ import { auth, db } from '../config/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { User } from '../types';
 import { userStorage } from '../utils/storage';
+import { sendPasswordResetEmail } from 'firebase/auth';
 
 interface AuthContextType {
   user: User | null;
@@ -21,6 +22,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
+  resetPassword : (email : string) => Promise<void>;
 }
 
 export const useAuth = () => {
@@ -28,6 +30,8 @@ export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+
 
   // Listen to auth state changes
   useEffect(() => {
@@ -40,6 +44,10 @@ export const useAuth = () => {
             const userData = userDoc.data() as User;
             setUser(userData);
             await userStorage.save(userData);
+          } else {
+            // User exists in Auth but not in Firestore
+            setUser(null);
+            await userStorage.clear();
           }
         } else {
           setUser(null);
@@ -47,6 +55,7 @@ export const useAuth = () => {
         }
       } catch (err) {
         console.error('Error fetching user:', err);
+        setUser(null);
         setError(err instanceof Error ? err.message : 'Error loading user');
       } finally {
         setLoading(false);
@@ -83,6 +92,7 @@ export const useAuth = () => {
       await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
       setUser(newUser);
       await userStorage.save(newUser);
+      router.replace('/(app)');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Sign up failed';
       setError(errorMessage);
@@ -104,11 +114,13 @@ export const useAuth = () => {
         if (userDoc.exists()) {
           const userData = userDoc.data() as User;
           setUser(userData);
-          router.replace('/(app)'); // ← AGREGAR ESTO - Navega al HomeScreen
+          router.replace('/(app)');
         }
       }
     } catch (err) {
-      // ...
+      const errorMessage = err instanceof Error ? err.message : 'Sign in failed';
+      setError(errorMessage);
+      throw err;
     } finally {
       setLoading(false);
     }
@@ -121,6 +133,7 @@ export const useAuth = () => {
       await signOut(auth);
       setUser(null);
       await userStorage.clear();
+      router.replace('/(auth)/login');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Logout failed';
       setError(errorMessage);
@@ -129,6 +142,22 @@ export const useAuth = () => {
       setLoading(false);
     }
   };
+
+  const resetPassword = async (email: string): Promise<void> => {
+    try {
+
+      await sendPasswordResetEmail(auth, email);
+      console.log('Email de reset enviado a:', email);
+    }catch(error: any){
+      if(error.code === 'auth/user-not-found') {
+        throw new Error('No hay una cuenta asociada');
+      }else if(error.code === 'auth/invalid-email') {
+        throw new Error('Email invalido');
+      }else {
+        throw new Error(error.message || 'Error al enviar el correo');
+      }
+    }
+  }
 
   const clearError = () => setError(null);
 
@@ -140,5 +169,6 @@ export const useAuth = () => {
     signIn,
     logout,
     clearError,
+    resetPassword,
   } as AuthContextType;
 };

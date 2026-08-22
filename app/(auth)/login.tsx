@@ -1,5 +1,5 @@
 /**
- * GoodJob - Login Screen (Expo Router)
+ * GoodJob - Login Screen (Mejorado)
  * Pantalla de inicio de sesión
  */
 
@@ -23,22 +23,43 @@ import {
   spacing,
 } from '../../src/components/common';
 
+// ============================================================================
+// HELPERS - Mover a utils/validators.ts después
+// ============================================================================
+
+const validateEmail = (email: string): boolean => {
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(email);
+};
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const { signIn, loading } = useAuth();
 
   const handleLogin = async () => {
     try {
       setError('');
 
-      // Validaciones básicas
+      // Validaciones
       if (!email.trim()) {
         setError('Por favor ingresa tu correo');
         return;
       }
+
+      // NUEVO: Validar formato de email
+      if (!validateEmail(email)) {
+        setError('Por favor ingresa un correo válido');
+        return;
+      }
+
       if (!password) {
         setError('Por favor ingresa tu contraseña');
         return;
@@ -46,14 +67,36 @@ export default function LoginScreen() {
 
       // Intentar iniciar sesión
       await signIn(email, password);
-      // Navigation happens automatically via useAuth hook
+
+      // NUEVO: Si rememberMe está activo, guardar credenciales (opcional)
+      // if (rememberMe) {
+      //   await AsyncStorage.setItem('lastEmail', email);
+      // }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al iniciar sesión');
+      const errorMessage = err instanceof Error ? err.message : 'Error al iniciar sesión';
+      
+      // Mensajes más específicos
+      if (errorMessage.includes('user-not-found')) {
+        setError('Usuario no encontrado');
+      } else if (errorMessage.includes('wrong-password')) {
+        setError('Contraseña incorrecta');
+      } else if (errorMessage.includes('too-many-requests')) {
+        setError('Demasiados intentos fallidos. Intenta más tarde.');
+      } else {
+        setError(errorMessage);
+      }
     }
   };
 
   const handleNavigateToSignup = () => {
     router.push('/signup');
+  };
+
+  // NUEVO: Password reset handler
+  const handleForgotPassword = () => {
+    // TODO: Implementar en futuro
+    // router.push('/forgot-password');
+    setError('Función de recuperación en desarrollo');
   };
 
   return (
@@ -74,9 +117,7 @@ export default function LoginScreen() {
 
         {/* Título */}
         <Text style={styles.title}>Bienvenido</Text>
-        <Text style={styles.subtitle}>
-          Inicia sesión para continuar
-        </Text>
+        <Text style={styles.subtitle}>Inicia sesión para continuar</Text>
 
         {/* Error message */}
         <ErrorMessage message={error} onDismiss={() => setError('')} />
@@ -87,7 +128,9 @@ export default function LoginScreen() {
             placeholder="Correo electrónico"
             value={email}
             onChangeText={setEmail}
+            icon="email"
             keyboardType="email-address"
+            autoCapitalize="none"
             editable={!loading}
           />
 
@@ -95,17 +138,28 @@ export default function LoginScreen() {
             placeholder="Contraseña"
             value={password}
             onChangeText={setPassword}
+            icon="lock"
             secureTextEntry
             editable={!loading}
           />
 
           {/* Remember me & Forgot password */}
           <View style={styles.footerOptions}>
+            {/* NUEVO: Remember me checkbox */}
+            {/* <TouchableOpacity
+              style={styles.rememberMeContainer}
+              onPress={() => setRememberMe(!rememberMe)}
+            >
+              <View style={[styles.checkbox, rememberMe && styles.checkboxActive]}>
+                {rememberMe && <Text style={styles.checkmark}>✓</Text>}
+              </View>
+              <Text style={styles.rememberMeText}>Recuerda esta sesión</Text>
+            </TouchableOpacity> */}
+
+            {/* Forgot password */}
             <LinkButton
               text="¿Olvidaste tu contraseña?"
-              onPress={() => {
-                // TODO: Implementar recuperación de contraseña
-              }}
+              onPress={() => router.push('/forgot-password')}
             />
           </View>
         </View>
@@ -113,9 +167,10 @@ export default function LoginScreen() {
         {/* Login Button */}
         <CustomButton
           title={loading ? 'Cargando...' : 'Iniciar Sesión'}
+          icon="check"
           onPress={handleLogin}
           loading={loading}
-          disabled={loading}
+          disabled={loading || !email || !password}
           size="large"
         />
 
@@ -182,7 +237,38 @@ const styles = StyleSheet.create({
   // Footer options
   footerOptions: {
     alignItems: 'flex-end',
-    marginTop: spacing.sm,
+    marginTop: spacing.md,
+    gap: spacing.sm,
+  },
+
+  // Remember me (opcional)
+  rememberMeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: colors.border,
+    marginRight: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  checkmark: {
+    color: colors.secondary,
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  rememberMeText: {
+    fontSize: 14,
+    color: colors.textLight,
   },
 
   // Signup container

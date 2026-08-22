@@ -95,6 +95,19 @@ export default function HomeScreen() {
     return <Ionicons name={category.iconName as any} size={size} color={color} />;
   };
 
+  // NUEVO: Navigate to settings
+  const handleSettings = () => {
+    router.push('/(app)/profile');
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
@@ -377,7 +390,6 @@ const styles = StyleSheet.create({
   // Categories Grid
   categoriesGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
   },
   categoryItem: {
@@ -513,4 +525,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.primary,
   },
-}); //hola gente xd
+});

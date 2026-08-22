@@ -1,6 +1,5 @@
 /**
- * GoodJob - Signup Screen (Expo Router)
- * Pantalla de registro
+ * GoodJob - Signup Screen (LIMPIO - SIN ERRORES)
  */
 
 import React, { useState } from 'react';
@@ -14,7 +13,9 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuth } from '../../src/utils/useAuth';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../src/config/firebase';
+import { userService } from '../../src/data/firestore';
 import {
   CustomInput,
   CustomButton,
@@ -23,14 +24,54 @@ import {
   colors,
   spacing,
 } from '../../src/components/common';
-import { User } from '../../src/types';
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+const validateEmail = (email: string) => {
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(email);
+};
+
+const validatePhoneMX = (phone: string) => {
+  const digits = phone.replace(/\D/g, '');
+  return digits.length === 10;
+};
+
+const getPasswordStrength = (password: string): number => {
+  let strength = 0;
+  if (password.length >= 8) strength++;
+  if (/[A-Z]/.test(password)) strength++;
+  if (/[0-9]/.test(password)) strength++;
+  if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) strength++;
+  return strength;
+};
+
+const getPasswordStrengthLabel = (strength: number): string => {
+  switch (strength) {
+    case 1:
+      return 'Muy débil';
+    case 2:
+      return 'Débil';
+    case 3:
+      return 'Fuerte';
+    case 4:
+      return 'Muy fuerte';
+    default:
+      return '';
+  }
+};
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
 
 export default function SignupScreen() {
   const router = useRouter();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
-    secondLastName: '',
     email: '',
     phone: '',
     password: '',
@@ -38,20 +79,26 @@ export default function SignupScreen() {
     role: 'employer' as 'employer' | 'worker' | 'both',
   });
   const [error, setError] = useState('');
-  const { signUp, loading } = useAuth();
+  const [agreeToTerms, setAgreeToTerms] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState(0);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({
       ...prev,
       [field]: value,
     }));
+
+    if (field === 'password') {
+      setPasswordStrength(getPasswordStrength(value));
+    }
   };
 
   const handleSignup = async () => {
     try {
       setError('');
+      setLoading(true);
 
-      // Validaciones
       if (!formData.firstName.trim()) {
         setError('Por favor ingresa tu nombre');
         return;
@@ -64,8 +111,16 @@ export default function SignupScreen() {
         setError('Por favor ingresa tu correo');
         return;
       }
+      if (!validateEmail(formData.email)) {
+        setError('Por favor ingresa un correo válido');
+        return;
+      }
       if (!formData.phone.trim()) {
         setError('Por favor ingresa tu teléfono');
+        return;
+      }
+      if (!validatePhoneMX(formData.phone)) {
+        setError('El teléfono debe tener 10 dígitos');
         return;
       }
       if (formData.password.length < 6) {
@@ -76,23 +131,35 @@ export default function SignupScreen() {
         setError('Las contraseñas no coinciden');
         return;
       }
+      if (!agreeToTerms) {
+        setError('Debes aceptar los Términos y Condiciones');
+        return;
+      }
 
-      // Registrar usuario
-      await signUp(formData.email, formData.password, {
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        formData.email,
+        formData.password
+      );
+
+      await userService.create(userCredential.user.uid, {
         firstName: formData.firstName,
         lastName: formData.lastName,
-        secondLastName: formData.secondLastName,
+        email: formData.email,
         phone: formData.phone,
         role: formData.role,
-      } as Partial<User>);
-      // Navigation happens automatically via useAuth hook
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al registrarse');
-    }
-  };
+      });
 
-  const handleNavigateToLogin = () => {
-    router.push('/login');
+      router.replace('/(app)');
+    } catch (err: any) {
+      if (err.code === 'auth/email-already-in-use') {
+        setError('Este correo ya está registrado');
+      } else {
+        setError(err.message || 'Error al registrarse');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -104,42 +171,33 @@ export default function SignupScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Crear Cuenta</Text>
-          <Text style={styles.subtitle}>
-            Únete a GoodJob y comienza ahora
-          </Text>
+          <Text style={styles.subtitle}>Únete a GoodJob</Text>
         </View>
 
-        {/* Error message */}
         <ErrorMessage message={error} onDismiss={() => setError('')} />
 
-        {/* Form */}
         <View style={styles.form}>
           <CustomInput
             placeholder="Nombre"
+            icon="account"
             value={formData.firstName}
             onChangeText={(value) => handleInputChange('firstName', value)}
             editable={!loading}
           />
 
           <CustomInput
-            placeholder="Apellido paterno"
+            placeholder="Apellido"
+            icon="account"
             value={formData.lastName}
             onChangeText={(value) => handleInputChange('lastName', value)}
             editable={!loading}
           />
 
           <CustomInput
-            placeholder="Apellido materno (opcional)"
-            value={formData.secondLastName}
-            onChangeText={(value) => handleInputChange('secondLastName', value)}
-            editable={!loading}
-          />
-
-          <CustomInput
             placeholder="Correo electrónico"
+            icon="email"
             value={formData.email}
             onChangeText={(value) => handleInputChange('email', value)}
             keyboardType="email-address"
@@ -148,6 +206,7 @@ export default function SignupScreen() {
 
           <CustomInput
             placeholder="Teléfono"
+            icon="phone"
             value={formData.phone}
             onChangeText={(value) => handleInputChange('phone', value)}
             keyboardType="phone-pad"
@@ -156,102 +215,125 @@ export default function SignupScreen() {
 
           <CustomInput
             placeholder="Contraseña"
+            icon="lock"
             value={formData.password}
             onChangeText={(value) => handleInputChange('password', value)}
             secureTextEntry
             editable={!loading}
           />
 
+          {formData.password ? (
+            <View style={styles.passwordStrengthContainer}>
+              <View style={styles.strengthBar}>
+                {[0, 1, 2, 3].map((i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.strengthSegment,
+                      i < passwordStrength && styles.strengthSegmentActive,
+                    ]}
+                  />
+                ))}
+              </View>
+              <Text
+                style={[
+                  styles.strengthLabel,
+                  {
+                    color:
+                      passwordStrength <= 1
+                        ? '#e74c3c'
+                        : passwordStrength === 2
+                        ? '#f39c12'
+                        : '#27ae60',
+                  },
+                ]}
+              >
+                Fortaleza: {getPasswordStrengthLabel(passwordStrength)}
+              </Text>
+            </View>
+          ) : null}
+
           <CustomInput
             placeholder="Confirmar contraseña"
+            icon="lock-check"
             value={formData.confirmPassword}
             onChangeText={(value) => handleInputChange('confirmPassword', value)}
             secureTextEntry
             editable={!loading}
           />
 
-          {/* Role Selection */}
           <Text style={styles.roleLabel}>¿Qué eres?</Text>
           <View style={styles.roleContainer}>
-            <RoleButton
-              label="Empleador"
-              isSelected={formData.role === 'employer'}
+            <TouchableOpacity
+              style={[
+                styles.roleButton,
+                formData.role === 'employer' && styles.roleButtonActive,
+              ]}
               onPress={() => handleInputChange('role', 'employer')}
               disabled={loading}
-            />
-            <RoleButton
-              label="Trabajador"
-              isSelected={formData.role === 'worker'}
+            >
+              <Text
+                style={[
+                  styles.roleButtonText,
+                  formData.role === 'employer' && styles.roleButtonTextActive,
+                ]}
+              >
+                Empleador
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.roleButton,
+                formData.role === 'worker' && styles.roleButtonActive,
+              ]}
               onPress={() => handleInputChange('role', 'worker')}
               disabled={loading}
-            />
-            <RoleButton
-              label="Ambos"
-              isSelected={formData.role === 'both'}
-              onPress={() => handleInputChange('role', 'both')}
-              disabled={loading}
-            />
+            >
+              <Text
+                style={[
+                  styles.roleButtonText,
+                  formData.role === 'worker' && styles.roleButtonTextActive,
+                ]}
+              >
+                Trabajador
+              </Text>
+            </TouchableOpacity>
           </View>
+
+          <TouchableOpacity
+            style={styles.termsContainer}
+            onPress={() => setAgreeToTerms(!agreeToTerms)}
+          >
+            <View
+              style={[styles.checkbox, agreeToTerms && styles.checkboxActive]}
+            >
+              {agreeToTerms && <Text style={styles.checkmark}>✓</Text>}
+            </View>
+            <Text style={styles.termsText}>
+              Acepto los{' '}
+              <Text style={styles.termsLink}>Términos y Condiciones</Text>
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Signup Button */}
         <CustomButton
           title={loading ? 'Registrando...' : 'Registrarse'}
+          icon="account-plus"
           onPress={handleSignup}
           loading={loading}
           disabled={loading}
           size="large"
         />
 
-        {/* Login link */}
         <View style={styles.loginContainer}>
           <Text style={styles.loginText}>¿Ya tienes cuenta? </Text>
-          <LinkButton text="Inicia sesión" onPress={handleNavigateToLogin} />
+          <LinkButton text="Inicia sesión" onPress={() => router.push('/login')} />
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
-
-// ============================================================================
-// Role Button Component
-// ============================================================================
-
-interface RoleButtonProps {
-  label: string;
-  isSelected: boolean;
-  onPress: () => void;
-  disabled?: boolean;
-}
-
-const RoleButton: React.FC<RoleButtonProps> = ({
-  label,
-  isSelected,
-  onPress,
-  disabled = false,
-}) => {
-  return (
-    <TouchableOpacity
-      style={[
-        styles.roleButton,
-        isSelected && styles.roleButtonSelected,
-        disabled && styles.roleButtonDisabled,
-      ]}
-      onPress={onPress}
-      disabled={disabled}
-      activeOpacity={0.7}
-    >
-      <Text
-        style={[
-          styles.roleButtonText,
-          isSelected && styles.roleButtonTextSelected,
-        ]}
-      >
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
-};
 
 const styles = StyleSheet.create({
   container: {
@@ -263,8 +345,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
   },
-
-  // Header
   header: {
     alignItems: 'center',
     marginBottom: spacing.xl,
@@ -274,20 +354,36 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.text,
     marginBottom: spacing.sm,
-    textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
     color: colors.textLight,
-    textAlign: 'center',
   },
-
-  // Form
   form: {
     marginVertical: spacing.lg,
   },
-
-  // Role Selection
+  passwordStrengthContainer: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  strengthBar: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  strengthSegment: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+  },
+  strengthSegmentActive: {
+    backgroundColor: '#27ae60',
+  },
+  strengthLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
   roleLabel: {
     fontSize: 14,
     fontWeight: '600',
@@ -297,40 +393,62 @@ const styles = StyleSheet.create({
   },
   roleContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     gap: spacing.md,
     marginBottom: spacing.lg,
   },
-
-  // Role Button
   roleButton: {
     flex: 1,
     paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
     borderRadius: 8,
-    backgroundColor: colors.gray,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: colors.border,
     alignItems: 'center',
   },
-  roleButtonSelected: {
+  roleButtonActive: {
     backgroundColor: colors.primary,
     borderColor: colors.primary,
-  },
-  roleButtonDisabled: {
-    opacity: 0.5,
   },
   roleButtonText: {
     fontSize: 14,
     fontWeight: '600',
     color: colors.text,
-    textAlign: 'center',
   },
-  roleButtonTextSelected: {
+  roleButtonTextActive: {
     color: colors.secondary,
   },
-
-  // Login container
+  termsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: spacing.lg,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: colors.border,
+    marginRight: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  checkmark: {
+    color: colors.secondary,
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  termsText: {
+    fontSize: 13,
+    color: colors.textLight,
+    flex: 1,
+  },
+  termsLink: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
   loginContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
