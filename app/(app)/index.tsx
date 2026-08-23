@@ -1,5 +1,6 @@
 // pantalla principal de Good Job
 import React, { useState } from 'react';
+import { router } from 'expo-router';
 import {
   StyleSheet,
   Text,
@@ -100,13 +101,7 @@ export default function HomeScreen() {
     router.push('/(app)/profile');
   };
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
+  
 
   return (
     <SafeAreaView style={styles.safeArea}>
