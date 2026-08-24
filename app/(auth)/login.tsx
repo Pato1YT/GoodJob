@@ -1,60 +1,51 @@
 /**
- * GoodJob - Login Screen (Mejorado)
- * Pantalla de inicio de sesión
+ * GoodJob - Login Screen
+ * Pantalla de inicio de sesión con el nuevo diseño UI y lógica integrada
  */
 
 import React, { useState } from 'react';
 import {
   View,
   Text,
+  TextInput,
+  TouchableOpacity,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../../src/utils/useAuth';
-import {
-  CustomInput,
-  CustomButton,
-  LinkButton,
-  ErrorMessage,
-  colors,
-  spacing,
-} from '../../src/components/common';
+import { ErrorMessage } from '../../src/components/common';
 
-// ============================================================================
-// HELPERS - Mover a utils/validators.ts después
-// ============================================================================
-
+// Helper para validar formato de correo
 const validateEmail = (email: string): boolean => {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return re.test(email);
 };
 
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
-
 export default function LoginScreen() {
   const router = useRouter();
+  const { signIn, loading } = useAuth();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
-  const { signIn, loading } = useAuth();
 
   const handleLogin = async () => {
     try {
       setError('');
 
-      // Validaciones
+      // Validaciones de formulario
       if (!email.trim()) {
         setError('Por favor ingresa tu correo');
         return;
       }
 
-      // NUEVO: Validar formato de email
       if (!validateEmail(email)) {
         setError('Por favor ingresa un correo válido');
         return;
@@ -65,17 +56,13 @@ export default function LoginScreen() {
         return;
       }
 
-      // Intentar iniciar sesión
+      // Llamada al método de autenticación original
       await signIn(email, password);
-
-      // NUEVO: Si rememberMe está activo, guardar credenciales (opcional)
-      // if (rememberMe) {
-      //   await AsyncStorage.setItem('lastEmail', email);
-      // }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error al iniciar sesión';
-      
-      // Mensajes más específicos
+      const errorMessage =
+        err instanceof Error ? err.message : 'Error al iniciar sesión';
+
+      // Manejo de mensajes de error específicos
       if (errorMessage.includes('user-not-found')) {
         setError('Usuario no encontrado');
       } else if (errorMessage.includes('wrong-password')) {
@@ -88,198 +75,260 @@ export default function LoginScreen() {
     }
   };
 
-  const handleNavigateToSignup = () => {
-    router.push('/signup');
-  };
-
-  // NUEVO: Password reset handler
-  const handleForgotPassword = () => {
-    // TODO: Implementar en futuro
-    // router.push('/forgot-password');
-    setError('Función de recuperación en desarrollo');
-  };
-
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.flexOne}
       >
-        {/* Logo */}
-        <View style={styles.logoContainer}>
-          <View style={styles.logoBg}>
-            <Text style={styles.logoText}>GOOD JOB</Text>
-          </View>
-        </View>
-
-        {/* Título */}
-        <Text style={styles.title}>Bienvenido</Text>
-        <Text style={styles.subtitle}>Inicia sesión para continuar</Text>
-
-        {/* Error message */}
-        <ErrorMessage message={error} onDismiss={() => setError('')} />
-
-        {/* Form */}
-        <View style={styles.form}>
-          <CustomInput
-            placeholder="Correo electrónico"
-            value={email}
-            onChangeText={setEmail}
-            icon="email"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            editable={!loading}
-          />
-
-          <CustomInput
-            placeholder="Contraseña"
-            value={password}
-            onChangeText={setPassword}
-            icon="lock"
-            secureTextEntry
-            editable={!loading}
-          />
-
-          {/* Remember me & Forgot password */}
-          <View style={styles.footerOptions}>
-            {/* NUEVO: Remember me checkbox */}
-            {/* <TouchableOpacity
-              style={styles.rememberMeContainer}
-              onPress={() => setRememberMe(!rememberMe)}
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Header Superior con Botón Atrás y Título Centrado */}
+          <View style={styles.header}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.back()}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <View style={[styles.checkbox, rememberMe && styles.checkboxActive]}>
-                {rememberMe && <Text style={styles.checkmark}>✓</Text>}
-              </View>
-              <Text style={styles.rememberMeText}>Recuerda esta sesión</Text>
-            </TouchableOpacity> */}
-
-            {/* Forgot password */}
-            <LinkButton
-              text="¿Olvidaste tu contraseña?"
-              onPress={() => router.push('/forgot-password')}
-            />
+              <MaterialIcons name="arrow-back" size={24} color="#000000" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Inicio de Sesión</Text>
+            <View style={styles.headerPlaceholder} />
           </View>
-        </View>
 
-        {/* Login Button */}
-        <CustomButton
-          title={loading ? 'Cargando...' : 'Iniciar Sesión'}
-          icon="check"
-          onPress={handleLogin}
-          loading={loading}
-          disabled={loading || !email || !password}
-          size="large"
-        />
+          <View style={styles.content}>
+            {/* Título Principal y Subtítulo */}
+            <View style={styles.titleContainer}>
+              <Text style={styles.brandTitle}>Good Job</Text>
+              <Text style={styles.subtitle}>Inicia sesión para continuar</Text>
+            </View>
 
-        {/* Signup link */}
-        <View style={styles.signupContainer}>
-          <Text style={styles.signupText}>¿No tienes cuenta? </Text>
-          <LinkButton text="Regístrate aquí" onPress={handleNavigateToSignup} />
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+            {/* Componente de Error */}
+            {error ? (
+              <View style={styles.errorWrapper}>
+                <ErrorMessage message={error} onDismiss={() => setError('')} />
+              </View>
+            ) : null}
+
+            {/* Formulario de Entrada */}
+            <View style={styles.form}>
+              {/* Input de Correo Electrónico */}
+              <View style={styles.inputContainer}>
+                <MaterialIcons
+                  name="mail-outline"
+                  size={20}
+                  color="#666666"
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Correo electrónico"
+                  placeholderTextColor="#757575"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  editable={!loading}
+                />
+              </View>
+
+              {/* Input de Contraseña con Toggle de Visibilidad */}
+              <View style={styles.inputContainer}>
+                <MaterialIcons
+                  name="lock-outline"
+                  size={20}
+                  color="#666666"
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Contraseña"
+                  placeholderTextColor="#757575"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  editable={!loading}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={styles.eyeIcon}
+                >
+                  <MaterialIcons
+                    name={showPassword ? 'visibility' : 'visibility-off'}
+                    size={20}
+                    color="#666666"
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {/* Enlace Olvidaste tu Contraseña */}
+              <TouchableOpacity
+                style={styles.forgotPasswordContainer}
+                onPress={() => router.push('/(auth)/forgot-password')}
+              >
+                <Text style={styles.forgotPasswordText}>
+                  ¿Olvidaste tu contraseña?
+                </Text>
+              </TouchableOpacity>
+
+              {/* Botón Iniciar Sesión */}
+              <TouchableOpacity
+                style={[
+                  styles.loginButton,
+                  (loading || !email || !password) && styles.loginButtonDisabled,
+                ]}
+                onPress={handleLogin}
+                activeOpacity={0.8}
+                disabled={loading || !email || !password}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <MaterialIcons name="check" size={20} color="#FFFFFF" />
+                    <Text style={styles.loginButtonText}>Iniciar Sesión</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Enlace para ir al Registro */}
+            <View style={styles.signupContainer}>
+              <Text style={styles.signupText}>¿No tienes cuenta? </Text>
+              <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
+                <Text style={styles.signupLink}>Regístrate aquí</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.secondary,
+    backgroundColor: '#FFFFFF',
+  },
+  flexOne: {
+    flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
   },
-
-  // Logo
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: spacing.xl,
-  },
-  logoBg: {
-    backgroundColor: colors.primary,
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.xxl,
-    borderRadius: 12,
-  },
-  logoText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: colors.secondary,
-    letterSpacing: 2,
-  },
-
-  // Title
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: spacing.sm,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.textLight,
-    textAlign: 'center',
-    marginBottom: spacing.xl,
-  },
-
-  // Form
-  form: {
-    marginVertical: spacing.lg,
-  },
-
-  // Footer options
-  footerOptions: {
-    alignItems: 'flex-end',
-    marginTop: spacing.md,
-    gap: spacing.sm,
-  },
-
-  // Remember me (opcional)
-  rememberMeContainer: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    height: 56,
   },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: colors.border,
-    marginRight: spacing.sm,
-    alignItems: 'center',
+  backButton: {
+    width: 40,
+    height: 40,
     justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
   },
-  checkboxActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#000000',
   },
-  checkmark: {
-    color: colors.secondary,
-    fontSize: 12,
-    fontWeight: 'bold',
+  headerPlaceholder: {
+    width: 40,
   },
-  rememberMeText: {
+  content: {
+    flex: 1,
+    paddingHorizontal: 24,
+    justifyContent: 'center',
+    paddingBottom: 40,
+  },
+  titleContainer: {
+    alignItems: 'center',
+    marginBottom: 28,
+  },
+  brandTitle: {
+    fontSize: 38,
+    fontWeight: '800',
+    color: '#000000',
+    marginBottom: 6,
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    fontSize: 15,
+    color: '#666666',
+  },
+  errorWrapper: {
+    marginBottom: 16,
+  },
+  form: {
+    gap: 16,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F3F3',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 56,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  input: {
+    flex: 1,
+    fontSize: 15,
+    color: '#000000',
+  },
+  eyeIcon: {
+    padding: 4,
+  },
+  forgotPasswordContainer: {
+    alignSelf: 'flex-end',
+    marginTop: -4,
+    marginBottom: 8,
+  },
+  forgotPasswordText: {
     fontSize: 14,
-    color: colors.textLight,
+    fontWeight: '600',
+    color: '#000000',
   },
-
-  // Signup container
+  loginButton: {
+    backgroundColor: '#000000',
+    borderRadius: 12,
+    height: 54,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  loginButtonDisabled: {
+    opacity: 0.6,
+  },
+  loginButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   signupContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: spacing.lg,
+    marginTop: 28,
   },
   signupText: {
-    color: colors.text,
-    fontSize: 14,
+    fontSize: 15,
+    color: '#666666',
+  },
+  signupLink: {
+    fontSize: 15,
+    color: '#000000',
+    fontWeight: '700',
   },
 });

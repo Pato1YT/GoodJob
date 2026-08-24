@@ -1,10 +1,6 @@
-/**
- * GoodJob - App Layout
- * Layout para pantallas autenticadas
- */
-
+import React from 'react';
 import { Tabs } from 'expo-router';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function AppLayout() {
   return (
@@ -13,30 +9,15 @@ export default function AppLayout() {
         headerShown: false,
         tabBarActiveTintColor: '#000000',
         tabBarInactiveTintColor: '#8E8E93',
-        tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopColor: '#E2E2E4',
-          borderTopWidth: 1,
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 6,
-        },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '500',
-        },
       }}
     >
+      {/* --- Pestañas visibles --- */}
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? 'home' : 'home-outline'}
-              size={22}
-              color={color}
-            />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home" size={size} color={color} />
           ),
         }}
       />
@@ -44,12 +25,8 @@ export default function AppLayout() {
         name="search"
         options={{
           title: 'Search',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? 'search' : 'search-outline'}
-              size={22}
-              color={color}
-            />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="search" size={size} color={color} />
           ),
         }}
       />
@@ -57,12 +34,8 @@ export default function AppLayout() {
         name="ai"
         options={{
           title: 'AI',
-          tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons
-              name={focused ? 'robot' : 'robot-outline'}
-              size={22}
-              color={color}
-            />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="hardware-chip-outline" size={size} color={color} />
           ),
         }}
       />
@@ -70,13 +43,29 @@ export default function AppLayout() {
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? 'person' : 'person-outline'}
-              size={22}
-              color={color}
-            />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person-outline" size={size} color={color} />
           ),
+        }}
+      />
+
+      {/* --- Ocultas (usando el nombre exacto del archivo/ruta) --- */}
+      <Tabs.Screen
+        name="booking"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="chat/[id]"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="worker/[id]"
+        options={{
+          href: null,
         }}
       />
     </Tabs>

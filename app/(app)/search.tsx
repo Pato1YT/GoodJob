@@ -1,20 +1,20 @@
-// pantalla de busqueda de Good Job
-import React, { useState } from 'react';
+// Pantalla de Búsqueda y Filtros
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
   View,
+  ScrollView,
   TextInput,
   TouchableOpacity,
-  ScrollView,
   Image,
   StatusBar,
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-// --- Paleta Monochrome Premium ---
 const COLORS = {
   background: '#F9F9FB',
   surface: '#FFFFFF',
@@ -24,19 +24,21 @@ const COLORS = {
   textSecondary: '#4C4546',
   primary: '#000000',
   onPrimary: '#FFFFFF',
+  error: '#BA1A1A',
 };
 
-const CATEGORY_FILTERS = ['Todos', 'Fontanería', 'Limpieza', 'Electricidad', 'Jardinería'];
+const CATEGORIES = ['Todos', 'Fontanería', 'Limpieza', 'Jardinería', 'Electricidad'];
 
 const ALL_PROFESSIONALS = [
   {
     id: '1',
     name: 'Carlos Rodríguez',
     category: 'Fontanería',
-    title: 'Fontanero Profesional',
+    roleTitle: 'Fontanero Profesional',
     rating: 4.8,
     distance: '1.2 km',
     price: 'Desde $30/h',
+    experience: '8 años',
     imageUrl:
       'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=400',
   },
@@ -44,50 +46,76 @@ const ALL_PROFESSIONALS = [
     id: '2',
     name: 'María González',
     category: 'Limpieza',
-    title: 'Servicio de Limpieza',
+    roleTitle: 'Servicio de Limpieza',
     rating: 4.9,
     distance: '0.8 km',
     price: 'Desde $25/h',
+    experience: '12 años',
     imageUrl:
       'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400',
   },
   {
     id: '3',
-    name: 'Andrés López',
-    category: 'Electricidad',
-    title: 'Electricista Certificado',
+    name: 'Javier López',
+    category: 'Jardinería',
+    roleTitle: 'Jardinero y Paisajista',
     rating: 4.7,
     distance: '2.5 km',
-    price: 'Desde $35/h',
+    price: 'Desde $28/h',
+    experience: '6 años',
     imageUrl:
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400',
+      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400',
+  },
+  {
+    id: '4',
+    name: 'Sofía Martínez',
+    category: 'Electricidad',
+    roleTitle: 'Electricista Certificada',
+    rating: 5.0,
+    distance: '1.8 km',
+    price: 'Desde $35/h',
+    experience: '10 años',
+    imageUrl:
+      'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=400',
   },
 ];
 
 export default function SearchScreen() {
+  const params = useLocalSearchParams<{ category?: string }>();
+  const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('Todos');
+
+  useEffect(() => {
+    if (params.category && CATEGORIES.includes(params.category)) {
+      setSelectedCategory(params.category);
+    }
+  }, [params.category]);
 
   const filteredProfessionals = ALL_PROFESSIONALS.filter((pro) => {
     const matchesCategory =
       selectedCategory === 'Todos' || pro.category === selectedCategory;
-    const matchesQuery =
+    const matchesSearch =
       pro.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      pro.title.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesQuery;
+      pro.roleTitle.toLowerCase().includes(searchQuery.toLowerCase());
+
+    return matchesCategory && matchesSearch;
   });
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
 
-      {/* --- Buscador y Botón de Filtro --- */}
+      {/* Header con Buscador */}
       <View style={styles.header}>
-        <View style={styles.searchBarContainer}>
-          <Ionicons name="search-outline" size={20} color={COLORS.textSecondary} />
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={22} color={COLORS.primary} />
+        </TouchableOpacity>
+
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={18} color={COLORS.textSecondary} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Buscar profesionales o servicios..."
+            placeholder="Buscar por nombre o servicio..."
             placeholderTextColor={COLORS.textSecondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -98,29 +126,21 @@ export default function SearchScreen() {
             </TouchableOpacity>
           )}
         </View>
-        <TouchableOpacity style={styles.filterButton} activeOpacity={0.7}>
-          <Ionicons name="options-outline" size={20} color={COLORS.primary} />
-        </TouchableOpacity>
       </View>
 
-      {/* --- Chips de Filtros --- */}
-      <View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipsContainer}
-        >
-          {CATEGORY_FILTERS.map((chip) => {
-            const isSelected = selectedCategory === chip;
+      {/* Chips de Categorías */}
+      <View style={styles.categoriesContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesScroll}>
+          {CATEGORIES.map((cat) => {
+            const isActive = selectedCategory === cat;
             return (
               <TouchableOpacity
-                key={chip}
-                style={[styles.chip, isSelected && styles.chipSelected]}
-                onPress={() => setSelectedCategory(chip)}
-                activeOpacity={0.7}
+                key={cat}
+                style={[styles.chip, isActive && styles.activeChip]}
+                onPress={() => setSelectedCategory(cat)}
               >
-                <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
-                  {chip}
+                <Text style={[styles.chipText, isActive && styles.activeChipText]}>
+                  {cat}
                 </Text>
               </TouchableOpacity>
             );
@@ -128,13 +148,11 @@ export default function SearchScreen() {
         </ScrollView>
       </View>
 
-      {/* --- Lista de Resultados --- */}
-      <ScrollView
-        contentContainerStyle={styles.resultsContainer}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={styles.resultsCountText}>
-          {filteredProfessionals.length} resultado{filteredProfessionals.length === 1 ? '' : 's'} encontrado{filteredProfessionals.length === 1 ? '' : 's'}
+      {/* Lista de Resultados */}
+      <ScrollView contentContainerStyle={styles.resultsList} showsVerticalScrollIndicator={false}>
+        <Text style={styles.resultsCount}>
+          {filteredProfessionals.length}{' '}
+          {filteredProfessionals.length === 1 ? 'resultado encontrado' : 'resultados encontrados'}
         </Text>
 
         {filteredProfessionals.map((pro) => (
@@ -142,23 +160,23 @@ export default function SearchScreen() {
             <Image source={{ uri: pro.imageUrl }} style={styles.proImage} />
             <View style={styles.proContent}>
               <Text style={styles.proName}>{pro.name}</Text>
-              <Text style={styles.proTitle}>{pro.title}</Text>
+              <Text style={styles.proRole}>{pro.roleTitle}</Text>
 
-              <View style={styles.proMetaRow}>
-                <View style={styles.badge}>
-                  <Ionicons name="star" size={14} color={COLORS.primary} />
-                  <Text style={styles.metaText}>{pro.rating}</Text>
-                </View>
+              <View style={styles.row}>
+                <Ionicons name="star" size={14} color={COLORS.primary} />
+                <Text style={styles.ratingText}>{pro.rating}</Text>
                 <Text style={styles.dot}>•</Text>
-                <View style={styles.badge}>
-                  <Ionicons name="location-outline" size={14} color={COLORS.textSecondary} />
-                  <Text style={styles.metaText}>{pro.distance}</Text>
-                </View>
+                <Ionicons name="location-outline" size={14} color={COLORS.textSecondary} />
+                <Text style={styles.infoText}>{pro.distance}</Text>
+                <Text style={styles.dot}>•</Text>
+                <Text style={styles.infoText}>{pro.price}</Text>
               </View>
 
-              <Text style={styles.priceText}>{pro.price}</Text>
-
-              <TouchableOpacity style={styles.profileButton} activeOpacity={0.8}>
+              <TouchableOpacity
+                style={styles.profileButton}
+                activeOpacity={0.8}
+                onPress={() => router.push(`/worker/${pro.id}`)}
+              >
                 <Text style={styles.profileButtonText}>Ver Perfil</Text>
                 <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
               </TouchableOpacity>
@@ -170,7 +188,6 @@ export default function SearchScreen() {
   );
 }
 
-// --- Estilos ---
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -180,40 +197,38 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingVertical: 12,
+    gap: 12,
   },
-  searchBarContainer: {
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.surfaceLow,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  searchBar: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: COLORS.surfaceVariant,
-    paddingHorizontal: 14,
-    height: 48,
+    backgroundColor: COLORS.surfaceLow,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
+    gap: 8,
   },
   searchInput: {
     flex: 1,
     fontSize: 14,
     color: COLORS.textPrimary,
-    marginLeft: 8,
   },
-  filterButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: COLORS.surfaceLow,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // Chips
-  chipsContainer: {
-    paddingHorizontal: 24,
+  categoriesContainer: {
     paddingVertical: 8,
+  },
+  categoriesScroll: {
+    paddingHorizontal: 20,
     gap: 8,
   },
   chip: {
@@ -221,93 +236,82 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: COLORS.surfaceLow,
-    borderWidth: 1,
-    borderColor: COLORS.surfaceVariant,
   },
-  chipSelected: {
+  activeChip: {
     backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
   },
   chipText: {
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: '600',
     color: COLORS.textSecondary,
   },
-  chipTextSelected: {
+  activeChipText: {
     color: COLORS.onPrimary,
   },
-
-  // Results
-  resultsContainer: {
-    paddingHorizontal: 24,
-    paddingTop: 12,
+  resultsList: {
+    paddingHorizontal: 20,
     paddingBottom: 40,
   },
-  resultsCountText: {
-    fontSize: 14,
+  resultsCount: {
+    fontSize: 13,
     color: COLORS.textSecondary,
     marginBottom: 16,
-    fontWeight: '500',
+    marginTop: 8,
   },
   proCard: {
+    flexDirection: 'row',
     backgroundColor: COLORS.surface,
-    borderRadius: 20,
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 14,
     borderWidth: 1,
     borderColor: COLORS.surfaceVariant,
-    overflow: 'hidden',
-    marginBottom: 16,
+    gap: 12,
   },
   proImage: {
-    width: '100%',
-    height: 150,
+    width: 90,
+    height: 100,
+    borderRadius: 12,
+    backgroundColor: COLORS.surfaceVariant,
   },
   proContent: {
-    padding: 16,
+    flex: 1,
+    justifyContent: 'center',
   },
   proName: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
     color: COLORS.textPrimary,
   },
-  proTitle: {
+  proRole: {
     fontSize: 13,
     color: COLORS.textSecondary,
     marginTop: 2,
   },
-  proMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  badge: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    marginTop: 8,
   },
-  metaText: {
+  ratingText: {
     fontSize: 13,
     fontWeight: '600',
     color: COLORS.textPrimary,
   },
   dot: {
-    marginHorizontal: 8,
     color: COLORS.surfaceVariant,
+    marginHorizontal: 2,
   },
-  priceText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginTop: 8,
+  infoText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
   },
   profileButton: {
-    marginTop: 12,
-    height: 42,
-    backgroundColor: COLORS.surfaceLow,
-    borderRadius: 12,
+    marginTop: 10,
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
   },
   profileButtonText: {
     fontSize: 13,

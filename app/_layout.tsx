@@ -14,7 +14,7 @@ export default function RootLayout() {
   useEffect(() => {
     seedDatabase();
   }, []);
-  
+
   const { loading } = useAuth();
 
   if (loading) {
@@ -24,12 +24,13 @@ export default function RootLayout() {
       </View>
     );
   }
-  
+
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(app)" />
+      <Stack.Screen name="worker" />
     </Stack>
   );
 }
