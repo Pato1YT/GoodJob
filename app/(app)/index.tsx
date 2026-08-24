@@ -1,11 +1,11 @@
-// pantalla principal de Good Job
+// pantalla principal de Good Job - Con todas las categorías cubiertas
 import React, { useState } from 'react';
+import { router } from 'expo-router';
 import {
   StyleSheet,
   Text,
   View,
   ScrollView,
-  TextInput,
   TouchableOpacity,
   Image,
   StatusBar,
@@ -47,7 +47,7 @@ interface Professional {
   imageUrl: string;
 }
 
-// --- Datos Falsos (Mock Data) ---
+// --- Datos de Ejemplo (Mock Data Completo) ---
 const CATEGORIES: Category[] = [
   { id: '1', name: 'Fontanería', iconName: 'plumbing', iconFamily: 'MaterialIcons' },
   { id: '2', name: 'Limpieza', iconName: 'cleaning-services', iconFamily: 'MaterialIcons', isNew: true },
@@ -78,10 +78,45 @@ const PROFESSIONALS: Professional[] = [
     imageUrl:
       'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400',
   },
+  {
+    id: '3',
+    name: 'Javier López',
+    category: 'Jardinero y Paisajista',
+    rating: 4.7,
+    distance: '2.5 km',
+    price: 'Desde $28/h',
+    experience: '6 años',
+    imageUrl:
+      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400',
+  },
+  {
+    id: '4',
+    name: 'Sofía Martínez',
+    category: 'Electricista Certificada',
+    rating: 5.0,
+    distance: '1.8 km',
+    price: 'Desde $35/h',
+    experience: '10 años',
+    imageUrl:
+      'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=400',
+  },
 ];
 
 export default function HomeScreen() {
-  const [problemText, setProblemText] = useState('');
+  const [favorites, setFavorites] = useState<string[]>([]);
+
+  const toggleFavorite = (id: string) => {
+    setFavorites((prev) =>
+      prev.includes(id) ? prev.filter((favId) => favId !== id) : [...prev, id]
+    );
+  };
+
+  const handleCategoryPress = (categoryName: string) => {
+    router.push({
+      pathname: '/search',
+      params: { category: categoryName },
+    });
+  };
 
   const renderCategoryIcon = (category: Category) => {
     const color = COLORS.primary;
@@ -95,18 +130,9 @@ export default function HomeScreen() {
     return <Ionicons name={category.iconName as any} size={size} color={color} />;
   };
 
-  // NUEVO: Navigate to settings
   const handleSettings = () => {
     router.push('/(app)/profile');
   };
-
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -118,7 +144,7 @@ export default function HomeScreen() {
           <MaterialIcons name="work" size={28} color={COLORS.primary} />
           <Text style={styles.logoText}>GoodJobs</Text>
         </View>
-        <TouchableOpacity style={styles.iconButton} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.iconButton} activeOpacity={0.7} onPress={handleSettings}>
           <Ionicons name="settings-outline" size={22} color={COLORS.primary} />
         </TouchableOpacity>
       </View>
@@ -141,27 +167,6 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* --- AI Prompt Search Input --- */}
-        <View style={styles.aiCard}>
-          <MaterialIcons name="auto-awesome" size={22} color={COLORS.primary} />
-          <TextInput
-            style={styles.aiInput}
-            placeholder="Describe tu problema..."
-            placeholderTextColor={COLORS.textSecondary}
-            value={problemText}
-            onChangeText={setProblemText}
-            multiline={false}
-          />
-          <View style={styles.aiActions}>
-            <TouchableOpacity style={styles.cameraButton} activeOpacity={0.7}>
-              <Ionicons name="camera-outline" size={20} color={COLORS.primary} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.micButton} activeOpacity={0.7}>
-              <Ionicons name="mic" size={20} color={COLORS.onPrimary} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
         {/* --- Soluciones Rápidas (Categories) --- */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Soluciones rápidas</Text>
@@ -171,6 +176,7 @@ export default function HomeScreen() {
                 key={cat.id}
                 style={styles.categoryItem}
                 activeOpacity={0.8}
+                onPress={() => handleCategoryPress(cat.name)}
               >
                 <View style={styles.categoryIconContainer}>
                   {cat.isNew && (
@@ -192,55 +198,75 @@ export default function HomeScreen() {
             <Text style={styles.sectionTitleHeader}>
               Profesionales recomendados para ti
             </Text>
-            <TouchableOpacity activeOpacity={0.7}>
+            <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/search')}>
               <Text style={styles.seeAllText}>Ver todos</Text>
             </TouchableOpacity>
           </View>
 
-          {PROFESSIONALS.map((pro) => (
-            <View key={pro.id} style={styles.proCard}>
-              <Image source={{ uri: pro.imageUrl }} style={styles.proImage} />
-              <View style={styles.proContent}>
-                <Text style={styles.proName}>{pro.name}</Text>
-                <Text style={styles.proCategory}>{pro.category}</Text>
-
-                <View style={styles.proRatingRow}>
-                  <View style={styles.ratingBadge}>
-                    <Ionicons name="star" size={14} color={COLORS.primary} />
-                    <Text style={styles.ratingText}>{pro.rating}</Text>
-                  </View>
-                  <Text style={styles.dotSeparator}>•</Text>
-                  <View style={styles.distanceBadge}>
-                    <Ionicons name="location-outline" size={14} color={COLORS.textSecondary} />
-                    <Text style={styles.distanceText}>{pro.distance}</Text>
-                  </View>
+          {PROFESSIONALS.map((pro) => {
+            const isFav = favorites.includes(pro.id);
+            return (
+              <View key={pro.id} style={styles.proCard}>
+                <View style={styles.imageContainer}>
+                  <Image source={{ uri: pro.imageUrl }} style={styles.proImage} />
+                  <TouchableOpacity
+                    style={styles.favoriteButton}
+                    activeOpacity={0.8}
+                    onPress={() => toggleFavorite(pro.id)}
+                  >
+                    <Ionicons
+                      name={isFav ? 'heart' : 'heart-outline'}
+                      size={20}
+                      color={isFav ? COLORS.error : COLORS.primary}
+                    />
+                  </TouchableOpacity>
                 </View>
 
-                <View style={styles.proDetailsRow}>
-                  <View style={styles.detailBox}>
-                    <Text style={styles.detailLabel}>PRECIO</Text>
-                    <Text style={styles.detailValue}>{pro.price}</Text>
-                  </View>
-                  <View style={styles.detailBox}>
-                    <Text style={styles.detailLabel}>EXPERIENCIA</Text>
-                    <Text style={styles.detailValue}>{pro.experience}</Text>
-                  </View>
-                </View>
+                <View style={styles.proContent}>
+                  <Text style={styles.proName}>{pro.name}</Text>
+                  <Text style={styles.proCategory}>{pro.category}</Text>
 
-                <TouchableOpacity style={styles.profileButton} activeOpacity={0.8}>
-                  <Text style={styles.profileButtonText}>Ver Perfil</Text>
-                  <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
-                </TouchableOpacity>
+                  <View style={styles.proRatingRow}>
+                    <View style={styles.ratingBadge}>
+                      <Ionicons name="star" size={14} color={COLORS.primary} />
+                      <Text style={styles.ratingText}>{pro.rating}</Text>
+                    </View>
+                    <Text style={styles.dotSeparator}>•</Text>
+                    <View style={styles.distanceBadge}>
+                      <Ionicons name="location-outline" size={14} color={COLORS.textSecondary} />
+                      <Text style={styles.distanceText}>{pro.distance}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.proDetailsRow}>
+                    <View style={styles.detailBox}>
+                      <Text style={styles.detailLabel}>PRECIO</Text>
+                      <Text style={styles.detailValue}>{pro.price}</Text>
+                    </View>
+                    <View style={styles.detailBox}>
+                      <Text style={styles.detailLabel}>EXPERIENCIA</Text>
+                      <Text style={styles.detailValue}>{pro.experience}</Text>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity 
+                    style={styles.profileButton} 
+                    activeOpacity={0.8}
+                    onPress={() => router.push(`/worker/${pro.id}`)}
+                  >
+                    <Text style={styles.profileButtonText}>Ver Perfil</Text>
+                    <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-// --- Estilos ---
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -275,15 +301,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 40,
   },
-
-  // Location Card
   locationCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.surfaceLow,
     borderRadius: 16,
     padding: 14,
-    marginBottom: 16,
+    marginBottom: 24,
   },
   locationIcon: {
     marginRight: 10,
@@ -310,54 +334,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-
-  // AI Prompt Bar
-  aiCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.surfaceVariant,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 28,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    elevation: 2,
-  },
-  aiInput: {
-    flex: 1,
-    fontSize: 16,
-    color: COLORS.textPrimary,
-    marginLeft: 10,
-    paddingVertical: 4,
-  },
-  aiActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  cameraButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: COLORS.surfaceLow,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  micButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // Sections
   section: {
     marginBottom: 28,
   },
@@ -386,8 +362,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.primary,
   },
-
-  // Categories Grid
   categoriesGrid: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -426,8 +400,6 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     textAlign: 'center',
   },
-
-  // Professional Cards
   proCard: {
     backgroundColor: COLORS.surface,
     borderRadius: 24,
@@ -441,10 +413,31 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 3,
   },
-  proImage: {
+  imageContainer: {
+    position: 'relative',
     width: '100%',
     height: 180,
+  },
+  proImage: {
+    width: '100%',
+    height: '100%',
     backgroundColor: COLORS.surfaceVariant,
+  },
+  favoriteButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   proContent: {
     padding: 20,
