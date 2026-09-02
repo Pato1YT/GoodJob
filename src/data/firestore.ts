@@ -15,8 +15,6 @@ import {
   where,
   orderBy,
   limit,
-  startAfter,
-  QueryConstraint,
   Timestamp,
   addDoc,
 } from 'firebase/firestore';
@@ -69,11 +67,13 @@ export const userService = {
     try {
       const docSnap = await getDoc(doc(db, 'users', userId));
       if (docSnap.exists()) {
+        const data = docSnap.data();
         return {
-          ...docSnap.data() as User,
-          createdAt: docSnap.data().createdAt?.toDate() || new Date(),
-          updatedAt: docSnap.data().updatedAt?.toDate() || new Date(),
-        };
+          ...data,
+          id: docSnap.id,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
+        } as User;
       }
       return null;
     } catch (error) {
@@ -102,17 +102,7 @@ export const userService = {
 
 export const workerService = {
   // Obtener trabajadores disponibles
-  /*async getAvailable(limit_count: number = 20): Promise<Worker[]> {
-    try {
-      const q = query(
-        collection(db, 'workers'),
-        where('available', '==', true),
-        where('verified', '==', true),
-        orderBy('avgRating', 'desc'),
-        limit(limit_count)
-      );*/
-
-    async getAvailable(limit_count: number = 20): Promise<Worker[]> {
+  async getAvailable(limit_count: number = 20): Promise<Worker[]> {
     try {
       const q = query(
         collection(db, 'workers'),
@@ -121,28 +111,33 @@ export const workerService = {
       );
 
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map((doc) => ({
-        ...doc.data() as Worker,
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-      }));
+      return querySnapshot.docs.map((docSnap) => {
+        const data = docSnap.data();
+        return {
+          ...data,
+          id: docSnap.id,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
+        } as Worker;
+      });
     } catch (error) {
       console.error('Error getting available workers:', error);
       throw error;
     }
   },
-  
 
   // Obtener trabajador por ID
   async getById(workerId: string): Promise<Worker | null> {
     try {
       const docSnap = await getDoc(doc(db, 'workers', workerId));
       if (docSnap.exists()) {
+        const data = docSnap.data();
         return {
-          ...docSnap.data() as Worker,
-          createdAt: docSnap.data().createdAt?.toDate() || new Date(),
-          updatedAt: docSnap.data().updatedAt?.toDate() || new Date(),
-        };
+          ...data,
+          id: docSnap.id,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
+        } as Worker;
       }
       return null;
     } catch (error) {
@@ -160,12 +155,11 @@ export const workerService = {
       );
 
       const querySnapshot = await getDocs(q);
-      const workerIds = querySnapshot.docs.map((doc) => doc.data().workerId);
+      const workerIds = querySnapshot.docs.map((docSnap) => docSnap.data().workerId);
 
-      // Obtener detalles de los trabajadores
       const workers: Worker[] = [];
       for (const workerId of workerIds) {
-        const worker = await this.getById(workerId);
+        const worker = await workerService.getById(workerId);
         if (worker) workers.push(worker);
       }
 
@@ -188,11 +182,15 @@ export const workerService = {
       );
 
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map((doc) => ({
-        ...doc.data() as Worker,
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-      }));
+      return querySnapshot.docs.map((docSnap) => {
+        const data = docSnap.data();
+        return {
+          ...data,
+          id: docSnap.id,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
+        } as Worker;
+      });
     } catch (error) {
       console.error('Error getting workers by rating:', error);
       throw error;
@@ -242,11 +240,15 @@ export const categoryService = {
       );
 
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map((doc) => ({
-        ...doc.data() as Category,
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-      }));
+      return querySnapshot.docs.map((docSnap) => {
+        const data = docSnap.data();
+        return {
+          ...data,
+          id: docSnap.id,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
+        } as Category;
+      });
     } catch (error) {
       console.error('Error getting categories:', error);
       throw error;
@@ -258,11 +260,13 @@ export const categoryService = {
     try {
       const docSnap = await getDoc(doc(db, 'categories', categoryId));
       if (docSnap.exists()) {
+        const data = docSnap.data();
         return {
-          ...docSnap.data() as Category,
-          createdAt: docSnap.data().createdAt?.toDate() || new Date(),
-          updatedAt: docSnap.data().updatedAt?.toDate() || new Date(),
-        };
+          ...data,
+          id: docSnap.id,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
+        } as Category;
       }
       return null;
     } catch (error) {
@@ -303,12 +307,16 @@ export const bookingService = {
       );
 
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map((doc) => ({
-        ...doc.data() as Booking,
-        scheduledDate: doc.data().scheduledDate?.toDate() || new Date(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-      }));
+      return querySnapshot.docs.map((docSnap) => {
+        const data = docSnap.data();
+        return {
+          ...data,
+          id: docSnap.id,
+          scheduledDate: data.scheduledDate?.toDate ? data.scheduledDate.toDate() : new Date(),
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
+        } as Booking;
+      });
     } catch (error) {
       console.error('Error getting user bookings:', error);
       throw error;
@@ -325,12 +333,16 @@ export const bookingService = {
       );
 
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map((doc) => ({
-        ...doc.data() as Booking,
-        scheduledDate: doc.data().scheduledDate?.toDate() || new Date(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-      }));
+      return querySnapshot.docs.map((docSnap) => {
+        const data = docSnap.data();
+        return {
+          ...data,
+          id: docSnap.id,
+          scheduledDate: data.scheduledDate?.toDate ? data.scheduledDate.toDate() : new Date(),
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
+        } as Booking;
+      });
     } catch (error) {
       console.error('Error getting worker bookings:', error);
       throw error;
@@ -342,12 +354,14 @@ export const bookingService = {
     try {
       const docSnap = await getDoc(doc(db, 'bookings', bookingId));
       if (docSnap.exists()) {
+        const data = docSnap.data();
         return {
-          ...docSnap.data() as Booking,
-          scheduledDate: docSnap.data().scheduledDate?.toDate() || new Date(),
-          createdAt: docSnap.data().createdAt?.toDate() || new Date(),
-          updatedAt: docSnap.data().updatedAt?.toDate() || new Date(),
-        };
+          ...data,
+          id: docSnap.id,
+          scheduledDate: data.scheduledDate?.toDate ? data.scheduledDate.toDate() : new Date(),
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
+        } as Booking;
       }
       return null;
     } catch (error) {
@@ -393,19 +407,33 @@ export const reviewService = {
   // Obtener reseñas del trabajador
   async getByWorkerId(workerId: string): Promise<Review[]> {
     try {
+      // 1. Consultamos únicamente por workerId para evitar conflictos de índices compuestos
       const q = query(
         collection(db, 'reviews'),
-        where('workerId', '==', workerId),
-        where('isVisible', '==', true),
-        orderBy('createdAt', 'desc')
+        where('workerId', '==', workerId)
       );
 
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map((doc) => ({
-        ...doc.data() as Review,
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-      }));
+      
+      const reviews = querySnapshot.docs
+        .map((docSnap) => {
+          const data = docSnap.data();
+          return {
+            ...data,
+            id: docSnap.id,
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt || Date.now()),
+            updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(data.updatedAt || Date.now()),
+          } as Review;
+        })
+        // 2. Filtramos visible en JS si existe la propiedad
+        .filter((review) => review.isVisible !== false);
+
+      // 3. Ordenamos las reseñas localmente por fecha descendente
+      return reviews.sort((a, b) => {
+        const timeA = new Date(a.createdAt).getTime();
+        const timeB = new Date(b.createdAt).getTime();
+        return timeB - timeA;
+      });
     } catch (error) {
       console.error('Error getting reviews:', error);
       throw error;
@@ -443,12 +471,16 @@ export const chatService = {
       );
 
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map((doc) => ({
-        ...doc.data() as Chat,
-        lastMessageAt: doc.data().lastMessageAt?.toDate() || new Date(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-      }));
+      return querySnapshot.docs.map((docSnap) => {
+        const data = docSnap.data();
+        return {
+          ...data,
+          id: docSnap.id,
+          lastMessageAt: data.lastMessageAt?.toDate ? data.lastMessageAt.toDate() : new Date(),
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
+        } as Chat;
+      });
     } catch (error) {
       console.error('Error getting chats:', error);
       throw error;
@@ -466,11 +498,15 @@ export const chatService = {
 
       const querySnapshot = await getDocs(q);
       return querySnapshot.docs
-        .map((doc) => ({
-          ...doc.data() as ChatMessage,
-          createdAt: doc.data().createdAt?.toDate() || new Date(),
-          updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-        }))
+        .map((docSnap) => {
+          const data = docSnap.data();
+          return {
+            ...data,
+            id: docSnap.id,
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
+            updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
+          } as ChatMessage;
+        })
         .reverse();
     } catch (error) {
       console.error('Error getting messages:', error);
@@ -538,11 +574,15 @@ export const favoriteService = {
       );
 
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map((doc) => ({
-        ...doc.data() as Favorite,
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-      }));
+      return querySnapshot.docs.map((docSnap) => {
+        const data = docSnap.data();
+        return {
+          ...data,
+          id: docSnap.id,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
+        } as Favorite;
+      });
     } catch (error) {
       console.error('Error getting favorites:', error);
       throw error;
@@ -592,11 +632,15 @@ export const notificationService = {
       );
 
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map((doc) => ({
-        ...doc.data() as Notification,
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-      }));
+      return querySnapshot.docs.map((docSnap) => {
+        const data = docSnap.data();
+        return {
+          ...data,
+          id: docSnap.id,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
+        } as Notification;
+      });
     } catch (error) {
       console.error('Error getting notifications:', error);
       throw error;

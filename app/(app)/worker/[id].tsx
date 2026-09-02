@@ -1,5 +1,5 @@
-// Pantalla de Detalle de Profesional
-import React, { useState } from 'react';
+// Pantalla de Detalle de Profesional (Vinculada con Firestore)
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -9,11 +9,16 @@ import {
   Image,
   StatusBar,
   Platform,
-  FlatList,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+
+// Importación de servicios de Firestore y tipos
+import { workerService, reviewService } from '../../../src/data/firestore';
+import { Worker, Review } from '../../../src/types';
 
 // --- Paleta de colores Monochrome Premium ---
 const COLORS = {
@@ -28,65 +33,102 @@ const COLORS = {
   error: '#BA1A1A',
 };
 
-// Mock data extendida del profesional
-const WORKER_DATA = {
-  id: '1',
-  name: 'Carlos Rodríguez',
-  category: 'Fontanero Profesional',
-  rating: 4.8,
-  reviewsCount: 42,
-  completedJobs: 128,
-  distance: '1.2 km',
-  price: '$30',
-  priceUnit: '/hora',
-  experience: '8 años',
-  about:
-    'Especialista en fontanería residencial y comercial. Diagnóstico rápido de fugas, instalación de grifería, desatascos e instalaciones complejas con más de 8 años de experiencia en el sector.',
-  imageUrl:
-    'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=400',
-  portfolio: [
-    'https://images.unsplash.com/photo-1585704032915-c3400ca199e7?auto=format&fit=crop&q=80&w=400',
-    'https://images.unsplash.com/photo-1507652313519-d4e9174996dd?auto=format&fit=crop&q=80&w=400',
-    'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&q=80&w=400',
-  ],
-  reviews: [
-    {
-      id: 'r1',
-      author: 'Laura M.',
-      rating: 5,
-      date: 'Hace 2 días',
-      comment: 'Excelente servicio. Llegó puntual, resolvió la fuga rápidamente y dejó todo limpio.',
-    },
-    {
-      id: 'r2',
-      author: 'Andrés P.',
-      rating: 4.5,
-      date: 'Hace 1 semana',
-      comment: 'Muy profesional y amable. Explica con claridad el problema antes de reparar.',
-    },
-  ],
-};
-
 export default function WorkerDetailScreen() {
-  const { id } = useLocalSearchParams();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const [isFavorite, setIsFavorite] = useState(false);
 
-  // En producción buscarías el registro según el 'id'
-  const worker = WORKER_DATA;
+  // Estados para los datos de Firestore
+  const [worker, setWorker] = useState<Worker | null>(null);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (id) {
+      loadWorkerData(id);
+    }
+  }, [id]);
+
+  const loadWorkerData = async (workerId: string) => {
+    try {
+      setLoading(true);
+      // Consulta a Firestore: Obtener perfil del profesional
+      const workerData = await workerService.getById(workerId);
+      setWorker(workerData);
+
+      // Consulta a Firestore: Obtener colección de reseñas relacionadas
+      const reviewData = await reviewService.getByWorkerId(workerId);
+      setReviews(reviewData);
+    } catch (error) {
+      console.error('Error al cargar datos de Firestore:', error);
+      Alert.alert('Error', 'No se pudieron obtener los detalles del profesional.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Mapeo flexible para asegurar lectura de campos de Firestore sin romper TypeScript
+  const w = worker as any;
 
   const handleRequestService = () => {
-    // Redirige al flujo de reserva pasando el ID del trabajador
+    if (!worker) return;
+    
+    // Obtener nombre formateado desde los campos de Firebase
+    const name = `${w?.firstName || ''} ${w?.lastName || ''}`.trim() || w?.userNameSnapshot || 'Profesional';
+
     router.push({
-      pathname: '/booking',
-      params: { workerId: worker.id, workerName: worker.name },
+      pathname: '/worker/booking' as any,
+      params: { 
+        workerId: worker.id, 
+        workerName: name
+      },
     });
   };
+
+  // Pantalla de carga mientras responde Firebase
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.safeArea, styles.centerContent]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Cargando perfil desde Firestore...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  // Si el id no existe en la colección 'workers' o 'users'
+  if (!worker) {
+    return (
+      <SafeAreaView style={[styles.safeArea, styles.centerContent]}>
+        <Ionicons name="alert-circle-outline" size={50} color={COLORS.textSecondary} />
+        <Text style={styles.notFoundText}>No se encontró información de este profesional.</Text>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Text style={styles.backButtonText}>Volver</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
+  // --- Mapeo seguro de campos de Firestore ---
+  const fullName = `${w.firstName || ''} ${w.lastName || ''}`.trim() || w.userNameSnapshot || 'Profesional GoodJob';
+  const categoryTitle = w.title || w.category || (w.bio ? w.bio.split('.')[0] : 'Especialista en servicios');
+  const ratingValue = w.avgRating !== undefined ? Number(w.avgRating).toFixed(1) : 'Nuevo';
+  const totalReviewsCount = w.totalReviews ?? reviews.length;
+  
+  // Soporte para arreglos de imágenes en Firestore
+  const portfolioImages: string[] = (w.portfolio && w.portfolio.length > 0)
+    ? w.portfolio 
+    : (w.portfolioUrls && w.portfolioUrls.length > 0)
+    ? w.portfolioUrls
+    : [
+        'https://images.unsplash.com/photo-1585704032915-c3400ca199e7?auto=format&fit=crop&q=80&w=400',
+        'https://images.unsplash.com/photo-1507652313519-d4e9174996dd?auto=format&fit=crop&q=80&w=400',
+        'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&q=80&w=400',
+      ];
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
 
-      {/* --- Header Superior --- */}
+      {/* --- Header --- */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.iconButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={22} color={COLORS.primary} />
@@ -102,93 +144,114 @@ export default function WorkerDetailScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* --- Card de Información Principal --- */}
+        {/* --- Card Principal de Usuario --- */}
         <View style={styles.profileHeaderCard}>
-          <Image source={{ uri: worker.imageUrl }} style={styles.avatar} />
-          <Text style={styles.workerName}>{worker.name}</Text>
-          <Text style={styles.workerCategory}>{worker.category}</Text>
+          <Image 
+            source={{ uri: w.avatarUrl || w.photoURL || 'https://via.placeholder.com/150' }} 
+            style={styles.avatar} 
+          />
+          <Text style={styles.workerName}>{fullName}</Text>
+          <Text style={styles.workerCategory}>{categoryTitle}</Text>
 
           <View style={styles.badgeRow}>
             <View style={styles.badge}>
               <Ionicons name="star" size={14} color={COLORS.primary} />
-              <Text style={styles.badgeText}>{worker.rating} ({worker.reviewsCount})</Text>
+              <Text style={styles.badgeText}>{ratingValue} ({totalReviewsCount})</Text>
             </View>
             <Text style={styles.dot}>•</Text>
             <View style={styles.badge}>
               <Ionicons name="location-outline" size={14} color={COLORS.textSecondary} />
-              <Text style={styles.badgeText}>{worker.distance}</Text>
+              <Text style={styles.badgeText}>{w.available !== false ? 'Disponible' : 'Ocupado'}</Text>
             </View>
           </View>
         </View>
 
-        {/* --- Estadísticas Rápidas --- */}
+        {/* --- Métricas / Stats de Firestore --- */}
         <View style={styles.statsContainer}>
           <View style={styles.statBox}>
             <Text style={styles.statLabel}>TRABAJOS</Text>
-            <Text style={styles.statValue}>{worker.completedJobs}+</Text>
+            <Text style={styles.statValue}>{(w.completedJobs ?? w.completedJobsCount) ?? 0}+</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statBox}>
             <Text style={styles.statLabel}>EXPERIENCIA</Text>
-            <Text style={styles.statValue}>{worker.experience}</Text>
+            <Text style={styles.statValue}>{(w.yearsExperience ?? w.experienceYears) ?? 1} años</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statBox}>
             <Text style={styles.statLabel}>TARIFA</Text>
-            <Text style={styles.statValue}>{worker.price}<Text style={styles.statUnit}>{worker.priceUnit}</Text></Text>
+            <Text style={styles.statValue}>
+              ${w.hourlyRate || 0}
+              <Text style={styles.statUnit}>/hr</Text>
+            </Text>
           </View>
         </View>
 
         {/* --- Biografía --- */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Sobre mí</Text>
-          <Text style={styles.bioText}>{worker.about}</Text>
+          <Text style={styles.bioText}>
+            {w.bio || 'Este profesional aún no ha añadido una descripción a su perfil.'}
+          </Text>
         </View>
 
-        {/* --- Galería de Trabajos Anteriores --- */}
+        {/* --- Galería de Trabajos --- */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Trabajos recientes</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.galleryScroll}>
-            {worker.portfolio.map((imgUrl, index) => (
+            {portfolioImages.map((imgUrl: string, index: number) => (
               <Image key={index} source={{ uri: imgUrl }} style={styles.portfolioImage} />
             ))}
           </ScrollView>
         </View>
 
-        {/* --- Reseñas --- */}
+        {/* --- Reseñas obtenidas de Firebase --- */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Opiniones</Text>
-            <Text style={styles.ratingSummary}>★ {worker.rating}</Text>
+            <Text style={styles.ratingSummary}>★ {ratingValue}</Text>
           </View>
 
-          {worker.reviews.map((rev) => (
-            <View key={rev.id} style={styles.reviewCard}>
-              <View style={styles.reviewHeader}>
-                <Text style={styles.reviewAuthor}>{rev.author}</Text>
-                <Text style={styles.reviewDate}>{rev.date}</Text>
+          {reviews.length === 0 ? (
+            <Text style={styles.emptyReviewsText}>Aún no hay opiniones registradas para este profesional.</Text>
+          ) : (
+            reviews.map((rev: any) => (
+              <View key={rev.id || Math.random().toString()} style={styles.reviewCard}>
+                <View style={styles.reviewHeader}>
+                  <Text style={styles.reviewAuthor}>{rev.userName || rev.authorName || 'Usuario'}</Text>
+                  <Text style={styles.reviewDate}>
+                    {rev.createdAt?.toDate 
+                      ? rev.createdAt.toDate().toLocaleDateString() 
+                      : rev.createdAt 
+                      ? new Date(rev.createdAt).toLocaleDateString() 
+                      : 'Reciente'}
+                  </Text>
+                </View>
+                <View style={styles.reviewRatingRow}>
+                  {Array.from({ length: 5 }).map((_, i: number) => (
+                    <Ionicons
+                      key={i}
+                      name={i < Math.floor(rev.rating || 5) ? 'star' : 'star-outline'}
+                      size={14}
+                      color={COLORS.primary}
+                    />
+                  ))}
+                </View>
+                <Text style={styles.reviewComment}>{rev.comment}</Text>
               </View>
-              <View style={styles.reviewRatingRow}>
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Ionicons
-                    key={i}
-                    name={i < Math.floor(rev.rating) ? 'star' : 'star-outline'}
-                    size={14}
-                    color={COLORS.primary}
-                  />
-                ))}
-              </View>
-              <Text style={styles.reviewComment}>{rev.comment}</Text>
-            </View>
-          ))}
+            ))
+          )}
         </View>
       </ScrollView>
 
-      {/* --- Barra Inferior Flotante de Acción --- */}
+      {/* --- Footer de Acción --- */}
       <View style={styles.bottomBar}>
         <View style={styles.priceContainer}>
           <Text style={styles.bottomPriceLabel}>Precio orientativo</Text>
-          <Text style={styles.bottomPriceValue}>{worker.price}<Text style={styles.bottomPriceUnit}>{worker.priceUnit}</Text></Text>
+          <Text style={styles.bottomPriceValue}>
+            ${w.hourlyRate || 0}
+            <Text style={styles.bottomPriceUnit}>/hora</Text>
+          </Text>
         </View>
         <TouchableOpacity style={styles.ctaButton} activeOpacity={0.8} onPress={handleRequestService}>
           <Text style={styles.ctaButtonText}>Solicitar Servicio</Text>
@@ -199,12 +262,39 @@ export default function WorkerDetailScreen() {
   );
 }
 
-// --- Estilos ---
+// --- Estilos de UI ---
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: COLORS.background,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 15,
+    color: COLORS.textSecondary,
+  },
+  notFoundText: {
+    fontSize: 16,
+    color: COLORS.textPrimary,
+    marginTop: 10,
+    textAlign: 'center',
+  },
+  backButton: {
+    marginTop: 15,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    color: COLORS.onPrimary,
+    fontWeight: 'bold',
   },
   header: {
     flexDirection: 'row',
@@ -270,8 +360,6 @@ const styles = StyleSheet.create({
   dot: {
     color: COLORS.surfaceVariant,
   },
-
-  // Stats
   statsContainer: {
     flexDirection: 'row',
     backgroundColor: COLORS.surface,
@@ -307,8 +395,6 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: COLORS.textSecondary,
   },
-
-  // Sections
   section: {
     marginBottom: 24,
   },
@@ -345,6 +431,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.primary,
   },
+  emptyReviewsText: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    fontStyle: 'italic',
+  },
   reviewCard: {
     backgroundColor: COLORS.surface,
     borderRadius: 14,
@@ -377,8 +468,6 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginTop: 4,
   },
-
-  // Bottom Bar
   bottomBar: {
     position: 'absolute',
     bottom: 0,

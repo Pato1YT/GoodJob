@@ -16,11 +16,12 @@ import { useRouter } from 'expo-router';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../src/config/firebase';
 import { userService } from '../../src/data/firestore';
+import { CustomModal, ModalType } from '../../src/components/CustomModal';
+import { getSpanishAuthErrorMessage } from '../../src/utils/firebaseErrors';
 import {
   CustomInput,
   CustomButton,
   LinkButton,
-  ErrorMessage,
   colors,
   spacing,
 } from '../../src/components/common';
@@ -78,10 +79,25 @@ export default function SignupScreen() {
     confirmPassword: '',
     role: 'employer' as 'employer' | 'worker' | 'both',
   });
-  const [error, setError] = useState('');
+  
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
+
+  // Estados para el Modal Reutilizable
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState<{ type: ModalType; message: string }>({
+    type: 'danger',
+    message: '',
+  });
+
+  const showErrorModal = (message: string) => {
+    setModalConfig({
+      type: 'danger',
+      message,
+    });
+    setModalVisible(true);
+  };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({
@@ -96,45 +112,44 @@ export default function SignupScreen() {
 
   const handleSignup = async () => {
     try {
-      setError('');
-      setLoading(true);
-
       if (!formData.firstName.trim()) {
-        setError('Por favor ingresa tu nombre');
+        showErrorModal('Por favor ingresa tu nombre');
         return;
       }
       if (!formData.lastName.trim()) {
-        setError('Por favor ingresa tu apellido');
+        showErrorModal('Por favor ingresa tu apellido');
         return;
       }
       if (!formData.email.trim()) {
-        setError('Por favor ingresa tu correo');
+        showErrorModal('Por favor ingresa tu correo');
         return;
       }
       if (!validateEmail(formData.email)) {
-        setError('Por favor ingresa un correo válido');
+        showErrorModal('Por favor ingresa un correo válido');
         return;
       }
       if (!formData.phone.trim()) {
-        setError('Por favor ingresa tu teléfono');
+        showErrorModal('Por favor ingresa tu teléfono');
         return;
       }
       if (!validatePhoneMX(formData.phone)) {
-        setError('El teléfono debe tener 10 dígitos');
+        showErrorModal('El teléfono debe tener 10 dígitos');
         return;
       }
       if (formData.password.length < 6) {
-        setError('La contraseña debe tener al menos 6 caracteres');
+        showErrorModal('La contraseña debe tener al menos 6 caracteres');
         return;
       }
       if (formData.password !== formData.confirmPassword) {
-        setError('Las contraseñas no coinciden');
+        showErrorModal('Las contraseñas no coinciden');
         return;
       }
       if (!agreeToTerms) {
-        setError('Debes aceptar los Términos y Condiciones');
+        showErrorModal('Debes aceptar los Términos y Condiciones');
         return;
       }
+
+      setLoading(true);
 
       const userCredential = await createUserWithEmailAndPassword(
         auth,
@@ -152,11 +167,11 @@ export default function SignupScreen() {
 
       router.replace('/(app)');
     } catch (err: any) {
-      if (err.code === 'auth/email-already-in-use') {
-        setError('Este correo ya está registrado');
-      } else {
-        setError(err.message || 'Error al registrarse');
-      }
+      // Traducir código de error o mensaje devuelto
+      const rawCode = err?.code || (err instanceof Error ? err.message : '');
+      const friendlyMessage = getSpanishAuthErrorMessage(rawCode);
+
+      showErrorModal(friendlyMessage);
     } finally {
       setLoading(false);
     }
@@ -175,8 +190,6 @@ export default function SignupScreen() {
           <Text style={styles.title}>Crear Cuenta</Text>
           <Text style={styles.subtitle}>Únete a GoodJob</Text>
         </View>
-
-        <ErrorMessage message={error} onDismiss={() => setError('')} />
 
         <View style={styles.form}>
           <CustomInput
@@ -331,6 +344,14 @@ export default function SignupScreen() {
           <LinkButton text="Inicia sesión" onPress={() => router.push('/login')} />
         </View>
       </ScrollView>
+
+      {/* Modal Reutilizable de Alertas */}
+      <CustomModal
+        visible={modalVisible}
+        type={modalConfig.type}
+        message={modalConfig.message}
+        onClose={() => setModalVisible(false)}
+      />
     </KeyboardAvoidingView>
   );
 }
