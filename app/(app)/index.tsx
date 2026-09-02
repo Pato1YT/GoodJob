@@ -1,5 +1,5 @@
-// pantalla principal de Good Job - Con todas las categorías cubiertas
-import React, { useState } from 'react';
+// pantalla principal de Good Job - Conectada a Firestore con datos reales
+import React, { useState, useEffect } from 'react';
 import { router } from 'expo-router';
 import {
   StyleSheet,
@@ -10,9 +10,13 @@ import {
   Image,
   StatusBar,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import { categoryService, workerService } from '../../src/data/firestore';
+import { Category, Worker } from '../../src/types';
+import { CustomModal, ModalType } from '../../src/components/CustomModal';
 
 // --- Paleta de colores Monochrome Premium ---
 const COLORS = {
@@ -27,83 +31,60 @@ const COLORS = {
   error: '#BA1A1A',
 };
 
-// --- Tipos de Datos ---
-interface Category {
-  id: string;
-  name: string;
-  iconName: string;
-  iconFamily: 'MaterialIcons' | 'MaterialCommunityIcons' | 'Ionicons';
-  isNew?: boolean;
-}
-
-interface Professional {
-  id: string;
-  name: string;
-  category: string;
-  rating: number;
-  distance: string;
-  price: string;
-  experience: string;
-  imageUrl: string;
-}
-
-// --- Datos de Ejemplo (Mock Data Completo) ---
-const CATEGORIES: Category[] = [
-  { id: '1', name: 'Fontanería', iconName: 'plumbing', iconFamily: 'MaterialIcons' },
-  { id: '2', name: 'Limpieza', iconName: 'cleaning-services', iconFamily: 'MaterialIcons', isNew: true },
-  { id: '3', name: 'Jardinería', iconName: 'grass', iconFamily: 'MaterialIcons' },
-  { id: '4', name: 'Electricidad', iconName: 'electrical-services', iconFamily: 'MaterialIcons' },
-];
-
-const PROFESSIONALS: Professional[] = [
-  {
-    id: '1',
-    name: 'Carlos Rodríguez',
-    category: 'Fontanero Profesional',
-    rating: 4.8,
-    distance: '1.2 km',
-    price: 'Desde $30/h',
-    experience: '8 años',
-    imageUrl:
-      'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=400',
-  },
-  {
-    id: '2',
-    name: 'María González',
-    category: 'Servicio de Limpieza',
-    rating: 4.9,
-    distance: '0.8 km',
-    price: 'Desde $25/h',
-    experience: '12 años',
-    imageUrl:
-      'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400',
-  },
-  {
-    id: '3',
-    name: 'Javier López',
-    category: 'Jardinero y Paisajista',
-    rating: 4.7,
-    distance: '2.5 km',
-    price: 'Desde $28/h',
-    experience: '6 años',
-    imageUrl:
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400',
-  },
-  {
-    id: '4',
-    name: 'Sofía Martínez',
-    category: 'Electricista Certificada',
-    rating: 5.0,
-    distance: '1.8 km',
-    price: 'Desde $35/h',
-    experience: '10 años',
-    imageUrl:
-      'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=400',
-  },
-];
+// Imagen por defecto si un trabajador no tiene foto en Firestore
+const DEFAULT_AVATAR =
+  'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=400';
 
 export default function HomeScreen() {
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [professionals, setProfessionals] = useState<Worker[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  // Estados para el Modal Reutilizable
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState<{
+    type: ModalType;
+    message: string;
+    onCloseAction?: () => void;
+  }>({
+    type: 'danger',
+    message: '',
+  });
+
+  const showModal = (type: ModalType, message: string, onCloseAction?: () => void) => {
+    setModalConfig({
+      type,
+      message,
+      onCloseAction,
+    });
+    setModalVisible(true);
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      // Peticiones en paralelo a Firestore
+      const [catsData, workersData] = await Promise.all([
+        categoryService.getAll(),
+        workerService.getAvailable(20),
+      ]);
+      setCategories(catsData);
+      setProfessionals(workersData);
+    } catch (error: any) {
+      console.error('Error al cargar información de Firestore:', error);
+      showModal(
+        'danger',
+        'Ocurrió un error al cargar la información. Por favor, reintenta.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const toggleFavorite = (id: string) => {
     setFavorites((prev) =>
@@ -118,21 +99,48 @@ export default function HomeScreen() {
     });
   };
 
-  const renderCategoryIcon = (category: Category) => {
-    const color = COLORS.primary;
-    const size = 26;
-    if (category.iconFamily === 'MaterialIcons') {
-      return <MaterialIcons name={category.iconName as any} size={size} color={color} />;
-    }
-    if (category.iconFamily === 'MaterialCommunityIcons') {
-      return <MaterialCommunityIcons name={category.iconName as any} size={size} color={color} />;
-    }
-    return <Ionicons name={category.iconName as any} size={size} color={color} />;
-  };
-
   const handleSettings = () => {
     router.push('/(app)/profile');
   };
+
+  const handleModalClose = () => {
+    setModalVisible(false);
+    if (modalConfig.onCloseAction) {
+      modalConfig.onCloseAction();
+    }
+  };
+
+  // Asigna un ícono según el nombre de la categoría si no hay un iconName guardado
+  const renderCategoryIcon = (category: Category) => {
+    const color = COLORS.primary;
+    const size = 26;
+    const nameLower = category.name.toLowerCase();
+
+    if (nameLower.includes('fontan') || nameLower.includes('plumb')) {
+      return <MaterialIcons name="plumbing" size={size} color={color} />;
+    }
+    if (nameLower.includes('limp') || nameLower.includes('clean')) {
+      return <MaterialIcons name="cleaning-services" size={size} color={color} />;
+    }
+    if (nameLower.includes('jard') || nameLower.includes('grass')) {
+      return <MaterialIcons name="grass" size={size} color={color} />;
+    }
+    if (nameLower.includes('electr')) {
+      return <MaterialIcons name="electrical-services" size={size} color={color} />;
+    }
+
+    return <Ionicons name="build-outline" size={size} color={color} />;
+  };
+
+  // Loader centrado mientras descarga de Firestore
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Cargando servicios...</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -167,32 +175,35 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* --- Soluciones Rápidas (Categories) --- */}
+        {/* --- Soluciones Rápidas (Categorías Reales) --- */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Soluciones rápidas</Text>
-          <View style={styles.categoriesGrid}>
-            {CATEGORIES.map((cat) => (
-              <TouchableOpacity
-                key={cat.id}
-                style={styles.categoryItem}
-                activeOpacity={0.8}
-                onPress={() => handleCategoryPress(cat.name)}
-              >
-                <View style={styles.categoryIconContainer}>
-                  {cat.isNew && (
-                    <View style={styles.newBadge}>
-                      <Text style={styles.newBadgeText}>NUEVO</Text>
+          {categories.length === 0 ? (
+            <Text style={styles.emptyText}>No hay categorías disponibles</Text>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -24, paddingHorizontal: 24 }}>
+              <View style={styles.categoriesGrid}>
+                {categories.map((cat) => (
+                  <TouchableOpacity
+                    key={cat.id}
+                    style={styles.categoryItem}
+                    activeOpacity={0.8}
+                    onPress={() => handleCategoryPress(cat.name)}
+                  >
+                    <View style={styles.categoryIconContainer}>
+                      {renderCategoryIcon(cat)}
                     </View>
-                  )}
-                  {renderCategoryIcon(cat)}
-                </View>
-                <Text style={styles.categoryName}>{cat.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+                    <Text style={styles.categoryName} numberOfLines={1}>
+                      {cat.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          )}
         </View>
 
-        {/* --- Profesionales Recomendados --- */}
+        {/* --- Profesionales Recomendados (Datos Reales de Firestore) --- */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitleHeader}>
@@ -203,66 +214,84 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          {PROFESSIONALS.map((pro) => {
-            const isFav = favorites.includes(pro.id);
-            return (
-              <View key={pro.id} style={styles.proCard}>
-                <View style={styles.imageContainer}>
-                  <Image source={{ uri: pro.imageUrl }} style={styles.proImage} />
-                  <TouchableOpacity
-                    style={styles.favoriteButton}
-                    activeOpacity={0.8}
-                    onPress={() => toggleFavorite(pro.id)}
-                  >
-                    <Ionicons
-                      name={isFav ? 'heart' : 'heart-outline'}
-                      size={20}
-                      color={isFav ? COLORS.error : COLORS.primary}
-                    />
-                  </TouchableOpacity>
-                </View>
+          {professionals.length === 0 ? (
+            <Text style={styles.emptyText}>No se encontraron trabajadores en este momento</Text>
+          ) : (
+            professionals.map((pro) => {
+              const isFav = favorites.includes(pro.id);
+              const name = pro.userNameSnapshot || 'Trabajador';
+              const photo = pro.userPhotoSnapshot || DEFAULT_AVATAR;
+              const rating = pro.avgRating ? pro.avgRating.toFixed(1) : '5.0';
+              const experience = pro.yearsExperience ? `${pro.yearsExperience} años` : 'N/A';
+              const bio = pro.bio || 'Profesional de servicios';
 
-                <View style={styles.proContent}>
-                  <Text style={styles.proName}>{pro.name}</Text>
-                  <Text style={styles.proCategory}>{pro.category}</Text>
-
-                  <View style={styles.proRatingRow}>
-                    <View style={styles.ratingBadge}>
-                      <Ionicons name="star" size={14} color={COLORS.primary} />
-                      <Text style={styles.ratingText}>{pro.rating}</Text>
-                    </View>
-                    <Text style={styles.dotSeparator}>•</Text>
-                    <View style={styles.distanceBadge}>
-                      <Ionicons name="location-outline" size={14} color={COLORS.textSecondary} />
-                      <Text style={styles.distanceText}>{pro.distance}</Text>
-                    </View>
+              return (
+                <View key={pro.id} style={styles.proCard}>
+                  <View style={styles.imageContainer}>
+                    <Image source={{ uri: photo }} style={styles.proImage} />
+                    <TouchableOpacity
+                      style={styles.favoriteButton}
+                      activeOpacity={0.8}
+                      onPress={() => toggleFavorite(pro.id)}
+                    >
+                      <Ionicons
+                        name={isFav ? 'heart' : 'heart-outline'}
+                        size={20}
+                        color={isFav ? COLORS.error : COLORS.primary}
+                      />
+                    </TouchableOpacity>
                   </View>
 
-                  <View style={styles.proDetailsRow}>
-                    <View style={styles.detailBox}>
-                      <Text style={styles.detailLabel}>PRECIO</Text>
-                      <Text style={styles.detailValue}>{pro.price}</Text>
-                    </View>
-                    <View style={styles.detailBox}>
-                      <Text style={styles.detailLabel}>EXPERIENCIA</Text>
-                      <Text style={styles.detailValue}>{pro.experience}</Text>
-                    </View>
-                  </View>
+                  <View style={styles.proContent}>
+                    <Text style={styles.proName}>{name}</Text>
+                    <Text style={styles.proCategory}>{bio}</Text>
 
-                  <TouchableOpacity 
-                    style={styles.profileButton} 
-                    activeOpacity={0.8}
-                    onPress={() => router.push(`/worker/${pro.id}`)}
-                  >
-                    <Text style={styles.profileButtonText}>Ver Perfil</Text>
-                    <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
-                  </TouchableOpacity>
+                    <View style={styles.proRatingRow}>
+                      <View style={styles.ratingBadge}>
+                        <Ionicons name="star" size={14} color={COLORS.primary} />
+                        <Text style={styles.ratingText}>{rating}</Text>
+                      </View>
+                      <Text style={styles.dotSeparator}>•</Text>
+                      <View style={styles.distanceBadge}>
+                        <Ionicons name="location-outline" size={14} color={COLORS.textSecondary} />
+                        <Text style={styles.distanceText}>Disponible</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.proDetailsRow}>
+                      <View style={styles.detailBox}>
+                        <Text style={styles.detailLabel}>RESEÑAS</Text>
+                        <Text style={styles.detailValue}>{pro.totalReviews || 0}</Text>
+                      </View>
+                      <View style={styles.detailBox}>
+                        <Text style={styles.detailLabel}>EXPERIENCIA</Text>
+                        <Text style={styles.detailValue}>{experience}</Text>
+                      </View>
+                    </View>
+
+                    <TouchableOpacity
+                      style={styles.profileButton}
+                      activeOpacity={0.8}
+                      onPress={() => router.push(`/worker/${pro.id}`)}
+                    >
+                      <Text style={styles.profileButtonText}>Ver Perfil</Text>
+                      <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
-            );
-          })}
+              );
+            })
+          )}
         </View>
       </ScrollView>
+
+      {/* Modal Reutilizable de Alertas */}
+      <CustomModal
+        visible={modalVisible}
+        type={modalConfig.type}
+        message={modalConfig.message}
+        onClose={handleModalClose}
+      />
     </SafeAreaView>
   );
 }
@@ -272,6 +301,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
   },
   header: {
     flexDirection: 'row',
@@ -362,13 +403,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.primary,
   },
+  emptyText: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginVertical: 16,
+  },
   categoriesGrid: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 16,
   },
   categoryItem: {
     alignItems: 'center',
-    width: '22%',
+    width: 72,
   },
   categoryIconContainer: {
     width: 64,
@@ -378,21 +426,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
-    position: 'relative',
-  },
-  newBadge: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    backgroundColor: COLORS.error,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  newBadgeText: {
-    color: COLORS.onPrimary,
-    fontSize: 9,
-    fontWeight: '700',
   },
   categoryName: {
     fontSize: 12,

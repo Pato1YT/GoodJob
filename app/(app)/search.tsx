@@ -1,4 +1,4 @@
-// Pantalla de Búsqueda y Filtros
+// Pantalla de Búsqueda y Filtros (Conectada con Firestore y CustomModal)
 import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
@@ -10,10 +10,16 @@ import {
   Image,
   StatusBar,
   Platform,
+  ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+
+// Importación del servicio de Firestore y tipos
+import { workerService } from '../../src/data/firestore';
+import { Worker } from '../../src/types';
 
 const COLORS = {
   background: '#F9F9FB',
@@ -29,74 +35,169 @@ const COLORS = {
 
 const CATEGORIES = ['Todos', 'Fontanería', 'Limpieza', 'Jardinería', 'Electricidad'];
 
-const ALL_PROFESSIONALS = [
-  {
-    id: '1',
-    name: 'Carlos Rodríguez',
-    category: 'Fontanería',
-    roleTitle: 'Fontanero Profesional',
-    rating: 4.8,
-    distance: '1.2 km',
-    price: 'Desde $30/h',
-    experience: '8 años',
-    imageUrl:
-      'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=400',
-  },
-  {
-    id: '2',
-    name: 'María González',
-    category: 'Limpieza',
-    roleTitle: 'Servicio de Limpieza',
-    rating: 4.9,
-    distance: '0.8 km',
-    price: 'Desde $25/h',
-    experience: '12 años',
-    imageUrl:
-      'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400',
-  },
-  {
-    id: '3',
-    name: 'Javier López',
-    category: 'Jardinería',
-    roleTitle: 'Jardinero y Paisajista',
-    rating: 4.7,
-    distance: '2.5 km',
-    price: 'Desde $28/h',
-    experience: '6 años',
-    imageUrl:
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400',
-  },
-  {
-    id: '4',
-    name: 'Sofía Martínez',
-    category: 'Electricidad',
-    roleTitle: 'Electricista Certificada',
-    rating: 5.0,
-    distance: '1.8 km',
-    price: 'Desde $35/h',
-    experience: '10 años',
-    imageUrl:
-      'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=400',
-  },
-];
+// Componente CustomModal
+interface CustomModalProps {
+  visible: boolean;
+  type?: 'success' | 'error' | 'info';
+  title: string;
+  message: string;
+  primaryButtonText?: string;
+  secondaryButtonText?: string;
+  onPrimaryPress: () => void;
+  onSecondaryPress?: () => void;
+}
+
+const CustomModal: React.FC<CustomModalProps> = ({
+  visible,
+  type = 'info',
+  title,
+  message,
+  primaryButtonText = 'Aceptar',
+  secondaryButtonText,
+  onPrimaryPress,
+  onSecondaryPress,
+}) => {
+  if (!visible) return null;
+
+  const getIcon = () => {
+    switch (type) {
+      case 'success':
+        return <Ionicons name="checkmark-circle" size={48} color="#2E7D32" />;
+      case 'error':
+        return <Ionicons name="alert-circle" size={48} color={COLORS.error} />;
+      default:
+        return <Ionicons name="information-circle" size={48} color={COLORS.primary} />;
+    }
+  };
+
+  return (
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onPrimaryPress}>
+      <View style={modalStyles.overlay}>
+        <View style={modalStyles.container}>
+          <View style={modalStyles.iconContainer}>{getIcon()}</View>
+
+          <Text style={modalStyles.title}>{title}</Text>
+          <Text style={modalStyles.message}>{message}</Text>
+
+          <View style={modalStyles.buttonContainer}>
+            {secondaryButtonText && onSecondaryPress && (
+              <TouchableOpacity
+                style={[modalStyles.button, modalStyles.secondaryButton]}
+                onPress={onSecondaryPress}
+              >
+                <Text style={modalStyles.secondaryButtonText}>{secondaryButtonText}</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={[
+                modalStyles.button,
+                modalStyles.primaryButton,
+                type === 'error' && { backgroundColor: COLORS.error },
+              ]}
+              onPress={onPrimaryPress}
+            >
+              <Text style={modalStyles.primaryButtonText}>{primaryButtonText}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
 
 export default function SearchScreen() {
   const params = useLocalSearchParams<{ category?: string }>();
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Estados para los trabajadores desde Firestore
+  const [professionals, setProfessionals] = useState<Worker[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  // Estado para el CustomModal
+  const [modalConfig, setModalConfig] = useState<{
+    visible: boolean;
+    type: 'success' | 'error' | 'info';
+    title: string;
+    message: string;
+    primaryButtonText?: string;
+    secondaryButtonText?: string;
+    onPrimaryPress: () => void;
+    onSecondaryPress?: () => void;
+  }>({
+    visible: false,
+    type: 'info',
+    title: '',
+    message: '',
+    onPrimaryPress: () => {},
+  });
+
+  const hideModal = () => {
+    setModalConfig((prev) => ({ ...prev, visible: false }));
+  };
+
+  // 1. Sincronizar parámetro de categoría inicial recibido por la URL
   useEffect(() => {
     if (params.category && CATEGORIES.includes(params.category)) {
       setSelectedCategory(params.category);
     }
   }, [params.category]);
 
-  const filteredProfessionals = ALL_PROFESSIONALS.filter((pro) => {
+  // 2. Cargar profesionales de Firestore al montar el componente
+  useEffect(() => {
+    fetchProfessionals();
+  }, []);
+
+  const fetchProfessionals = async () => {
+    try {
+      setLoading(true);
+      const service = workerService as any;
+      const getFn = service.getAll || service.getWorkers || service.getAllWorkers;
+
+      if (typeof getFn === 'function') {
+        const data = await getFn();
+        setProfessionals(data || []);
+      } else {
+        setProfessionals([]);
+      }
+    } catch (error) {
+      console.error('Error al obtener trabajadores de Firestore:', error);
+      setProfessionals([]);
+      
+      setModalConfig({
+        visible: true,
+        type: 'error',
+        title: 'Error de conexión',
+        message: 'No se pudieron cargar los profesionales. Por favor, verifica tu conexión a internet e inténtalo de nuevo.',
+        primaryButtonText: 'Reintentar',
+        secondaryButtonText: 'Cancelar',
+        onPrimaryPress: () => {
+          hideModal();
+          fetchProfessionals();
+        },
+        onSecondaryPress: hideModal,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 3. Filtrado dinámico local según búsqueda y categoría seleccionada
+  const filteredProfessionals = professionals.filter((pro) => {
+    const w = pro as any;
+
+    const proName = `${w.firstName || ''} ${w.lastName || ''}`.trim() || w.userNameSnapshot || '';
+    const proCategory = w.category || w.title || '';
+    const proRole = w.roleTitle || w.title || w.category || '';
+
     const matchesCategory =
-      selectedCategory === 'Todos' || pro.category === selectedCategory;
+      selectedCategory === 'Todos' ||
+      proCategory.toLowerCase() === selectedCategory.toLowerCase();
+
     const matchesSearch =
-      pro.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      pro.roleTitle.toLowerCase().includes(searchQuery.toLowerCase());
+      proName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      proRole.toLowerCase().includes(searchQuery.toLowerCase());
 
     return matchesCategory && matchesSearch;
   });
@@ -130,7 +231,11 @@ export default function SearchScreen() {
 
       {/* Chips de Categorías */}
       <View style={styles.categoriesContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesScroll}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesScroll}
+        >
           {CATEGORIES.map((cat) => {
             const isActive = selectedCategory === cat;
             return (
@@ -148,46 +253,153 @@ export default function SearchScreen() {
         </ScrollView>
       </View>
 
-      {/* Lista de Resultados */}
-      <ScrollView contentContainerStyle={styles.resultsList} showsVerticalScrollIndicator={false}>
-        <Text style={styles.resultsCount}>
-          {filteredProfessionals.length}{' '}
-          {filteredProfessionals.length === 1 ? 'resultado encontrado' : 'resultados encontrados'}
-        </Text>
+      {/* Lista de Resultados de Firestore */}
+      {loading ? (
+        <View style={styles.centerLoading}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Buscando profesionales...</Text>
+        </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.resultsList}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.resultsCount}>
+            {filteredProfessionals.length}{' '}
+            {filteredProfessionals.length === 1 ? 'resultado encontrado' : 'resultados encontrados'}
+          </Text>
 
-        {filteredProfessionals.map((pro) => (
-          <View key={pro.id} style={styles.proCard}>
-            <Image source={{ uri: pro.imageUrl }} style={styles.proImage} />
-            <View style={styles.proContent}>
-              <Text style={styles.proName}>{pro.name}</Text>
-              <Text style={styles.proRole}>{pro.roleTitle}</Text>
-
-              <View style={styles.row}>
-                <Ionicons name="star" size={14} color={COLORS.primary} />
-                <Text style={styles.ratingText}>{pro.rating}</Text>
-                <Text style={styles.dot}>•</Text>
-                <Ionicons name="location-outline" size={14} color={COLORS.textSecondary} />
-                <Text style={styles.infoText}>{pro.distance}</Text>
-                <Text style={styles.dot}>•</Text>
-                <Text style={styles.infoText}>{pro.price}</Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.profileButton}
-                activeOpacity={0.8}
-                onPress={() => router.push(`/worker/${pro.id}`)}
-              >
-                <Text style={styles.profileButtonText}>Ver Perfil</Text>
-                <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
-              </TouchableOpacity>
+          {filteredProfessionals.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="search-outline" size={48} color={COLORS.textSecondary} />
+              <Text style={styles.emptyText}>No se encontraron profesionales con esos criterios.</Text>
             </View>
-          </View>
-        ))}
-      </ScrollView>
+          ) : (
+            filteredProfessionals.map((pro) => {
+              const w = pro as any;
+              const name = `${w.firstName || ''} ${w.lastName || ''}`.trim() || w.userNameSnapshot || 'Profesional';
+              const roleTitle = w.roleTitle || w.title || w.category || 'Especialista en servicios';
+              const rating = w.avgRating !== undefined ? Number(w.avgRating).toFixed(1) : 'Nuevo';
+              const price = w.hourlyRate ? `$${w.hourlyRate}/h` : 'A convenir';
+              const imageUrl = w.avatarUrl || w.photoURL || 'https://via.placeholder.com/150';
+
+              return (
+                <View key={pro.id} style={styles.proCard}>
+                  <Image source={{ uri: imageUrl }} style={styles.proImage} />
+                  <View style={styles.proContent}>
+                    <Text style={styles.proName}>{name}</Text>
+                    <Text style={styles.proRole}>{roleTitle}</Text>
+
+                    <View style={styles.row}>
+                      <Ionicons name="star" size={14} color={COLORS.primary} />
+                      <Text style={styles.ratingText}>{rating}</Text>
+                      <Text style={styles.dot}>•</Text>
+                      <Ionicons name="pricetag-outline" size={14} color={COLORS.textSecondary} />
+                      <Text style={styles.infoText}>{price}</Text>
+                    </View>
+
+                    <TouchableOpacity
+                      style={styles.profileButton}
+                      activeOpacity={0.8}
+                      onPress={() => router.push(`/worker/${pro.id}`)}
+                    >
+                      <Text style={styles.profileButtonText}>Ver Perfil</Text>
+                      <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })
+          )}
+        </ScrollView>
+      )}
+
+      {/* Modal Personalizado Integrado */}
+      <CustomModal
+        visible={modalConfig.visible}
+        type={modalConfig.type}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        primaryButtonText={modalConfig.primaryButtonText}
+        secondaryButtonText={modalConfig.secondaryButtonText}
+        onPrimaryPress={modalConfig.onPrimaryPress}
+        onSecondaryPress={modalConfig.onSecondaryPress}
+      />
     </SafeAreaView>
   );
 }
 
+// Estilos del Modal
+const modalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  container: {
+    width: '100%',
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  iconContainer: {
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  message: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  button: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  primaryButton: {
+    backgroundColor: COLORS.primary,
+  },
+  secondaryButton: {
+    backgroundColor: COLORS.surfaceLow,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceVariant,
+  },
+  primaryButtonText: {
+    color: COLORS.onPrimary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  secondaryButtonText: {
+    color: COLORS.textPrimary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+});
+
+// Estilos Principales
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -248,6 +460,16 @@ const styles = StyleSheet.create({
   activeChipText: {
     color: COLORS.onPrimary,
   },
+  centerLoading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: COLORS.textSecondary,
+  },
   resultsList: {
     paddingHorizontal: 20,
     paddingBottom: 40,
@@ -257,6 +479,16 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginBottom: 16,
     marginTop: 8,
+  },
+  emptyState: {
+    alignItems: 'center',
+    marginTop: 40,
+    gap: 12,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
   },
   proCard: {
     flexDirection: 'row',

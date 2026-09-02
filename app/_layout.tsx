@@ -7,13 +7,13 @@ import { useAuth } from '../src/utils/useAuth';
 import { ActivityIndicator, View } from 'react-native';
 import { colors } from '../src/components/common';
 import { Stack } from 'expo-router';
-import { seedDatabase } from '../src/utils/seedData';
+// import { seedDatabase } from '../src/utils/seedData';
 import { useEffect } from 'react';
 
 export default function RootLayout() {
-  useEffect(() => {
-    seedDatabase();
-  }, []);
+  //useEffect(() => {
+   // seedDatabase();
+  //}, []);
 
   const { loading } = useAuth();
 

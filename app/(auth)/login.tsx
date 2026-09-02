@@ -19,7 +19,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../../src/utils/useAuth';
-import { ErrorMessage } from '../../src/components/common';
+import { CustomModal, ModalType } from '../../src/components/CustomModal';
+import { getSpanishAuthErrorMessage } from '../../src/utils/firebaseErrors';
 
 // Helper para validar formato de correo
 const validateEmail = (email: string): boolean => {
@@ -34,44 +35,48 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+
+  // Estados para el Modal Reutilizable
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState<{ type: ModalType; message: string }>({
+    type: 'danger',
+    message: '',
+  });
+
+  const showErrorModal = (message: string) => {
+    setModalConfig({
+      type: 'danger',
+      message,
+    });
+    setModalVisible(true);
+  };
 
   const handleLogin = async () => {
     try {
-      setError('');
-
       // Validaciones de formulario
       if (!email.trim()) {
-        setError('Por favor ingresa tu correo');
+        showErrorModal('Por favor ingresa tu correo');
         return;
       }
 
       if (!validateEmail(email)) {
-        setError('Por favor ingresa un correo válido');
+        showErrorModal('Por favor ingresa un correo válido');
         return;
       }
 
       if (!password) {
-        setError('Por favor ingresa tu contraseña');
+        showErrorModal('Por favor ingresa tu contraseña');
         return;
       }
 
       // Llamada al método de autenticación original
       await signIn(email, password);
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Error al iniciar sesión';
+    } catch (err: any) {
+      // Traducir código de error o mensaje devuelto
+      const rawCode = err?.code || (err instanceof Error ? err.message : '');
+      const friendlyMessage = getSpanishAuthErrorMessage(rawCode);
 
-      // Manejo de mensajes de error específicos
-      if (errorMessage.includes('user-not-found')) {
-        setError('Usuario no encontrado');
-      } else if (errorMessage.includes('wrong-password')) {
-        setError('Contraseña incorrecta');
-      } else if (errorMessage.includes('too-many-requests')) {
-        setError('Demasiados intentos fallidos. Intenta más tarde.');
-      } else {
-        setError(errorMessage);
-      }
+      showErrorModal(friendlyMessage);
     }
   };
 
@@ -105,13 +110,6 @@ export default function LoginScreen() {
               <Text style={styles.brandTitle}>Good Job</Text>
               <Text style={styles.subtitle}>Inicia sesión para continuar</Text>
             </View>
-
-            {/* Componente de Error */}
-            {error ? (
-              <View style={styles.errorWrapper}>
-                <ErrorMessage message={error} onDismiss={() => setError('')} />
-              </View>
-            ) : null}
 
             {/* Formulario de Entrada */}
             <View style={styles.form}>
@@ -205,6 +203,14 @@ export default function LoginScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Modal Reutilizable de Alertas */}
+      <CustomModal
+        visible={modalVisible}
+        type={modalConfig.type}
+        message={modalConfig.message}
+        onClose={() => setModalVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -262,9 +268,6 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 15,
     color: '#666666',
-  },
-  errorWrapper: {
-    marginBottom: 16,
   },
   form: {
     gap: 16,
