@@ -1,5 +1,6 @@
 //Codigo temporal para que no marque error en menu
 import React, { useState } from 'react';
+import { useRouter } from 'expo-router';
 import {
   View,
   Text,
@@ -28,6 +29,7 @@ const COLORS = {
 };
 
 export default function ProfileScreen() {
+  const router = useRouter();
   const [fullName, setFullName] = useState('Alex Morgan');
   const [email, setEmail] = useState('alex.morgan@example.com');
   const [phone, setPhone] = useState('+1 (555) 019-2837');
@@ -200,6 +202,23 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Seguridad */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Ionicons name="shield-checkmark-outline" size={20} color={COLORS.primary} />
+            <Text style={styles.cardTitle}>Security</Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={() => router.push('/(app)/setup-2fa')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="lock-closed-outline" size={18} color={COLORS.text} />
+            <Text style={styles.secondaryButtonText}>Activar verificación en dos pasos</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Acciones de Cuenta */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
@@ -223,6 +242,7 @@ export default function ProfileScreen() {
     </SafeAreaView>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {

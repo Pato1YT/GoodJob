@@ -1,6 +1,7 @@
 /**
  * GoodJob - Login Screen
  * Pantalla de inicio de sesión con el nuevo diseño UI y lógica integrada
+ * 
  */
 
 import React, { useState } from 'react';
@@ -21,8 +22,9 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../../src/utils/useAuth';
 import { CustomModal, ModalType } from '../../src/components/CustomModal';
 import { getSpanishAuthErrorMessage } from '../../src/utils/firebaseErrors';
+import { tiene2FAActivado, enviarCodigoOTP } from '../../src/utils/emailOtp';
+import { setPendingUid } from '../../src/utils/pendingAuthStore';
 
-// Helper para validar formato de correo
 const validateEmail = (email: string): boolean => {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return re.test(email);
@@ -36,7 +38,6 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Estados para el Modal Reutilizable
   const [modalVisible, setModalVisible] = useState(false);
   const [modalConfig, setModalConfig] = useState<{ type: ModalType; message: string }>({
     type: 'danger',
@@ -44,38 +45,38 @@ export default function LoginScreen() {
   });
 
   const showErrorModal = (message: string) => {
-    setModalConfig({
-      type: 'danger',
-      message,
-    });
+    setModalConfig({ type: 'danger', message });
     setModalVisible(true);
   };
 
   const handleLogin = async () => {
     try {
-      // Validaciones de formulario
       if (!email.trim()) {
         showErrorModal('Por favor ingresa tu correo');
         return;
       }
-
       if (!validateEmail(email)) {
         showErrorModal('Por favor ingresa un correo válido');
         return;
       }
-
       if (!password) {
         showErrorModal('Por favor ingresa tu contraseña');
         return;
       }
 
-      // Llamada al método de autenticación original
-      await signIn(email, password);
+      const userCredential = await signIn(email, password);
+      const tiene2FA = await tiene2FAActivado(userCredential.user.uid);
+
+      if (tiene2FA) {
+        await enviarCodigoOTP(userCredential.user.uid, email);
+        setPendingUid(userCredential.user.uid);
+        router.push('/(auth)/two_step_verification');
+      } else {
+        router.replace('/(app)');
+      }
     } catch (err: any) {
-      // Traducir código de error o mensaje devuelto
       const rawCode = err?.code || (err instanceof Error ? err.message : '');
       const friendlyMessage = getSpanishAuthErrorMessage(rawCode);
-
       showErrorModal(friendlyMessage);
     }
   };
@@ -91,7 +92,6 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Header Superior con Botón Atrás y Título Centrado */}
           <View style={styles.header}>
             <TouchableOpacity
               style={styles.backButton}
@@ -105,22 +105,14 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.content}>
-            {/* Título Principal y Subtítulo */}
             <View style={styles.titleContainer}>
               <Text style={styles.brandTitle}>Good Job</Text>
               <Text style={styles.subtitle}>Inicia sesión para continuar</Text>
             </View>
 
-            {/* Formulario de Entrada */}
             <View style={styles.form}>
-              {/* Input de Correo Electrónico */}
               <View style={styles.inputContainer}>
-                <MaterialIcons
-                  name="mail-outline"
-                  size={20}
-                  color="#666666"
-                  style={styles.inputIcon}
-                />
+                <MaterialIcons name="mail-outline" size={20} color="#666666" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder="Correo electrónico"
@@ -133,14 +125,8 @@ export default function LoginScreen() {
                 />
               </View>
 
-              {/* Input de Contraseña con Toggle de Visibilidad */}
               <View style={styles.inputContainer}>
-                <MaterialIcons
-                  name="lock-outline"
-                  size={20}
-                  color="#666666"
-                  style={styles.inputIcon}
-                />
+                <MaterialIcons name="lock-outline" size={20} color="#666666" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder="Contraseña"
@@ -150,10 +136,7 @@ export default function LoginScreen() {
                   secureTextEntry={!showPassword}
                   editable={!loading}
                 />
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  style={styles.eyeIcon}
-                >
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
                   <MaterialIcons
                     name={showPassword ? 'visibility' : 'visibility-off'}
                     size={20}
@@ -162,17 +145,13 @@ export default function LoginScreen() {
                 </TouchableOpacity>
               </View>
 
-              {/* Enlace Olvidaste tu Contraseña */}
               <TouchableOpacity
                 style={styles.forgotPasswordContainer}
                 onPress={() => router.push('/(auth)/forgot-password')}
               >
-                <Text style={styles.forgotPasswordText}>
-                  ¿Olvidaste tu contraseña?
-                </Text>
+                <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
               </TouchableOpacity>
 
-              {/* Botón Iniciar Sesión */}
               <TouchableOpacity
                 style={[
                   styles.loginButton,
@@ -193,7 +172,6 @@ export default function LoginScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Enlace para ir al Registro */}
             <View style={styles.signupContainer}>
               <Text style={styles.signupText}>¿No tienes cuenta? </Text>
               <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
@@ -204,7 +182,6 @@ export default function LoginScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Modal Reutilizable de Alertas */}
       <CustomModal
         visible={modalVisible}
         type={modalConfig.type}
@@ -216,16 +193,9 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  flexOne: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  flexOne: { flex: 1 },
+  scrollContent: { flexGrow: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -233,45 +203,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: 56,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 20,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#000000',
-  },
-  headerPlaceholder: {
-    width: 40,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-    justifyContent: 'center',
-    paddingBottom: 40,
-  },
-  titleContainer: {
-    alignItems: 'center',
-    marginBottom: 28,
-  },
-  brandTitle: {
-    fontSize: 38,
-    fontWeight: '800',
-    color: '#000000',
-    marginBottom: 6,
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 15,
-    color: '#666666',
-  },
-  form: {
-    gap: 16,
-  },
+  backButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center', borderRadius: 20 },
+  headerTitle: { fontSize: 22, fontWeight: '700', color: '#000000' },
+  headerPlaceholder: { width: 40 },
+  content: { flex: 1, paddingHorizontal: 24, justifyContent: 'center', paddingBottom: 40 },
+  titleContainer: { alignItems: 'center', marginBottom: 28 },
+  brandTitle: { fontSize: 38, fontWeight: '800', color: '#000000', marginBottom: 6, letterSpacing: -0.5 },
+  subtitle: { fontSize: 15, color: '#666666' },
+  form: { gap: 16 },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -280,27 +219,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: 56,
   },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    fontSize: 15,
-    color: '#000000',
-  },
-  eyeIcon: {
-    padding: 4,
-  },
-  forgotPasswordContainer: {
-    alignSelf: 'flex-end',
-    marginTop: -4,
-    marginBottom: 8,
-  },
-  forgotPasswordText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#000000',
-  },
+  inputIcon: { marginRight: 12 },
+  input: { flex: 1, fontSize: 15, color: '#000000' },
+  eyeIcon: { padding: 4 },
+  forgotPasswordContainer: { alignSelf: 'flex-end', marginTop: -4, marginBottom: 8 },
+  forgotPasswordText: { fontSize: 14, fontWeight: '600', color: '#000000' },
   loginButton: {
     backgroundColor: '#000000',
     borderRadius: 12,
@@ -311,27 +234,9 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 4,
   },
-  loginButtonDisabled: {
-    opacity: 0.6,
-  },
-  loginButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  signupContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 28,
-  },
-  signupText: {
-    fontSize: 15,
-    color: '#666666',
-  },
-  signupLink: {
-    fontSize: 15,
-    color: '#000000',
-    fontWeight: '700',
-  },
+  loginButtonDisabled: { opacity: 0.6 },
+  loginButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  signupContainer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 28 },
+  signupText: { fontSize: 15, color: '#666666' },
+  signupLink: { fontSize: 15, color: '#000000', fontWeight: '700' },
 });
