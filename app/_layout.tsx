@@ -10,6 +10,23 @@ import { Stack } from 'expo-router';
 // import { seedDatabase } from '../src/utils/seedData';
 import { useEffect } from 'react';
 
+
+
+if(typeof window !== 'undefined'){
+  const resizeObserveErrorHandler= (e:ErrorEvent)=>{
+if(
+  e.message.includes('ResizeObserver loop') ||
+  e.message.includes('timeout exceeded')
+){
+  e.stopImmediatePropagation();
+}
+  };
+  window.addEventListener('error', resizeObserveErrorHandler);
+}
+
+
+
+
 export default function RootLayout() {
   //useEffect(() => {
    // seedDatabase();

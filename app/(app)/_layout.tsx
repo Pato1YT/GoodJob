@@ -68,6 +68,17 @@ export default function AppLayout() {
           href: null,
         }}
       />
+      <Tabs.Screen
+        name="setup-2fa"
+        options={{
+          href: null,
+        }}
+      />
+
     </Tabs>
+
+
+
+    
   );
 }
