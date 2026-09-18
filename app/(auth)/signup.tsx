@@ -11,20 +11,21 @@ import {
   Platform,
   StyleSheet,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../src/config/firebase';
 import { userService } from '../../src/data/firestore';
-import { CustomModal, ModalType } from '../../src/components/CustomModal';
+import { CustomModal, ModalType } from '../../src/modules/shared/components/CustomModal';
 import { getSpanishAuthErrorMessage } from '../../src/utils/firebaseErrors';
-import {
-  CustomInput,
-  CustomButton,
-  LinkButton,
-  colors,
-  spacing,
-} from '../../src/components/common';
+import { COLORS } from '../../src/modules/shared/theme/colors';
+
+// Componentes modulares de Auth
+import { AuthInput } from '../../src/modules/auth/components/AuthInput';
+import { AuthHeader } from '../../src/modules/auth/components/AuthHeader';
+import { PasswordStrengthBar } from '../../src/modules/auth/components/PasswordStrengthBar';
 
 // ============================================================================
 // HELPERS
@@ -32,7 +33,7 @@ import {
 
 const validateEmail = (email: string) => {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return re.test(email);
+  return re.test(email.trim());
 };
 
 const validatePhoneMX = (phone: string) => {
@@ -79,6 +80,9 @@ export default function SignupScreen() {
     confirmPassword: '',
     role: 'employer' as 'employer' | 'worker' | 'both',
   });
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -153,15 +157,15 @@ export default function SignupScreen() {
 
       const userCredential = await createUserWithEmailAndPassword(
         auth,
-        formData.email,
+        formData.email.trim(),
         formData.password
       );
 
       await userService.create(userCredential.user.uid, {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        phone: formData.phone,
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
         role: formData.role,
       });
 
@@ -178,172 +182,169 @@ export default function SignupScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.flexOne}
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>Crear Cuenta</Text>
-          <Text style={styles.subtitle}>Únete a GoodJob</Text>
-        </View>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Header Superior con Botón Atrás y Título Centrado */}
+          <AuthHeader title="Crear Cuenta" onBackPress={() => router.back()} />
 
-        <View style={styles.form}>
-          <CustomInput
-            placeholder="Nombre"
-            icon="account"
-            value={formData.firstName}
-            onChangeText={(value) => handleInputChange('firstName', value)}
-            editable={!loading}
-          />
+          <View style={styles.content}>
+            <View style={styles.headerTitleContainer}>
+              <Text style={styles.brandTitle}>Good Job</Text>
+              <Text style={styles.subtitle}>Únete a la plataforma</Text>
+            </View>
 
-          <CustomInput
-            placeholder="Apellido"
-            icon="account"
-            value={formData.lastName}
-            onChangeText={(value) => handleInputChange('lastName', value)}
-            editable={!loading}
-          />
+            <View style={styles.form}>
+              <AuthInput
+                iconName="person-outline"
+                placeholder="Nombre"
+                value={formData.firstName}
+                onChangeText={(value) => handleInputChange('firstName', value)}
+                editable={!loading}
+              />
 
-          <CustomInput
-            placeholder="Correo electrónico"
-            icon="email"
-            value={formData.email}
-            onChangeText={(value) => handleInputChange('email', value)}
-            keyboardType="email-address"
-            editable={!loading}
-          />
+              <AuthInput
+                iconName="person-outline"
+                placeholder="Apellido"
+                value={formData.lastName}
+                onChangeText={(value) => handleInputChange('lastName', value)}
+                editable={!loading}
+              />
 
-          <CustomInput
-            placeholder="Teléfono"
-            icon="phone"
-            value={formData.phone}
-            onChangeText={(value) => handleInputChange('phone', value)}
-            keyboardType="phone-pad"
-            editable={!loading}
-          />
+              <AuthInput
+                iconName="mail-outline"
+                placeholder="Correo electrónico"
+                value={formData.email}
+                onChangeText={(value) => handleInputChange('email', value)}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                editable={!loading}
+              />
 
-          <CustomInput
-            placeholder="Contraseña"
-            icon="lock"
-            value={formData.password}
-            onChangeText={(value) => handleInputChange('password', value)}
-            secureTextEntry
-            editable={!loading}
-          />
+              <AuthInput
+                iconName="phone"
+                placeholder="Teléfono"
+                value={formData.phone}
+                onChangeText={(value) => handleInputChange('phone', value)}
+                keyboardType="phone-pad"
+                editable={!loading}
+              />
 
-          {formData.password ? (
-            <View style={styles.passwordStrengthContainer}>
-              <View style={styles.strengthBar}>
-                {[0, 1, 2, 3].map((i) => (
-                  <View
-                    key={i}
+              <AuthInput
+                iconName="lock-outline"
+                placeholder="Contraseña"
+                value={formData.password}
+                onChangeText={(value) => handleInputChange('password', value)}
+                isPassword
+                showPassword={showPassword}
+                onTogglePassword={() => setShowPassword(!showPassword)}
+                editable={!loading}
+              />
+
+              {formData.password ? (
+                <PasswordStrengthBar
+                  strength={passwordStrength}
+                  label={getPasswordStrengthLabel(passwordStrength)}
+                />
+              ) : null}
+
+              <AuthInput
+                iconName="lock-outline"
+                placeholder="Confirmar contraseña"
+                value={formData.confirmPassword}
+                onChangeText={(value) => handleInputChange('confirmPassword', value)}
+                isPassword
+                showPassword={showConfirmPassword}
+                onTogglePassword={() => setShowConfirmPassword(!showConfirmPassword)}
+                editable={!loading}
+              />
+
+              <Text style={styles.roleLabel}>¿Qué eres?</Text>
+              <View style={styles.roleContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.roleButton,
+                    formData.role === 'employer' && styles.roleButtonActive,
+                  ]}
+                  onPress={() => handleInputChange('role', 'employer')}
+                  disabled={loading}
+                >
+                  <Text
                     style={[
-                      styles.strengthSegment,
-                      i < passwordStrength && styles.strengthSegmentActive,
+                      styles.roleButtonText,
+                      formData.role === 'employer' && styles.roleButtonTextActive,
                     ]}
-                  />
-                ))}
+                  >
+                    Empleador
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.roleButton,
+                    formData.role === 'worker' && styles.roleButtonActive,
+                  ]}
+                  onPress={() => handleInputChange('role', 'worker')}
+                  disabled={loading}
+                >
+                  <Text
+                    style={[
+                      styles.roleButtonText,
+                      formData.role === 'worker' && styles.roleButtonTextActive,
+                    ]}
+                  >
+                    Trabajador
+                  </Text>
+                </TouchableOpacity>
               </View>
-              <Text
-                style={[
-                  styles.strengthLabel,
-                  {
-                    color:
-                      passwordStrength <= 1
-                        ? '#e74c3c'
-                        : passwordStrength === 2
-                        ? '#f39c12'
-                        : '#27ae60',
-                  },
-                ]}
+
+              <TouchableOpacity
+                style={styles.termsContainer}
+                onPress={() => setAgreeToTerms(!agreeToTerms)}
+                activeOpacity={0.7}
               >
-                Fortaleza: {getPasswordStrengthLabel(passwordStrength)}
-              </Text>
+                <View
+                  style={[styles.checkbox, agreeToTerms && styles.checkboxActive]}
+                >
+                  {agreeToTerms && <Text style={styles.checkmark}>✓</Text>}
+                </View>
+                <Text style={styles.termsText}>
+                  Acepto los{' '}
+                  <Text style={styles.termsLink}>Términos y Condiciones</Text>
+                </Text>
+              </TouchableOpacity>
+
+              {/* Botón Registrarse */}
+              <TouchableOpacity
+                style={[styles.signupButton, loading && styles.buttonDisabled]}
+                onPress={handleSignup}
+                activeOpacity={0.8}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color={COLORS.surface} />
+                ) : (
+                  <Text style={styles.signupButtonText}>Registrarse</Text>
+                )}
+              </TouchableOpacity>
             </View>
-          ) : null}
 
-          <CustomInput
-            placeholder="Confirmar contraseña"
-            icon="lock-check"
-            value={formData.confirmPassword}
-            onChangeText={(value) => handleInputChange('confirmPassword', value)}
-            secureTextEntry
-            editable={!loading}
-          />
-
-          <Text style={styles.roleLabel}>¿Qué eres?</Text>
-          <View style={styles.roleContainer}>
-            <TouchableOpacity
-              style={[
-                styles.roleButton,
-                formData.role === 'employer' && styles.roleButtonActive,
-              ]}
-              onPress={() => handleInputChange('role', 'employer')}
-              disabled={loading}
-            >
-              <Text
-                style={[
-                  styles.roleButtonText,
-                  formData.role === 'employer' && styles.roleButtonTextActive,
-                ]}
-              >
-                Empleador
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.roleButton,
-                formData.role === 'worker' && styles.roleButtonActive,
-              ]}
-              onPress={() => handleInputChange('role', 'worker')}
-              disabled={loading}
-            >
-              <Text
-                style={[
-                  styles.roleButtonText,
-                  formData.role === 'worker' && styles.roleButtonTextActive,
-                ]}
-              >
-                Trabajador
-              </Text>
-            </TouchableOpacity>
+            <View style={styles.loginContainer}>
+              <Text style={styles.loginText}>¿Ya tienes cuenta? </Text>
+              <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
+                <Text style={styles.loginLink}>Inicia sesión</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-
-          <TouchableOpacity
-            style={styles.termsContainer}
-            onPress={() => setAgreeToTerms(!agreeToTerms)}
-          >
-            <View
-              style={[styles.checkbox, agreeToTerms && styles.checkboxActive]}
-            >
-              {agreeToTerms && <Text style={styles.checkmark}>✓</Text>}
-            </View>
-            <Text style={styles.termsText}>
-              Acepto los{' '}
-              <Text style={styles.termsLink}>Términos y Condiciones</Text>
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <CustomButton
-          title={loading ? 'Registrando...' : 'Registrarse'}
-          icon="account-plus"
-          onPress={handleSignup}
-          loading={loading}
-          disabled={loading}
-          size="large"
-        />
-
-        <View style={styles.loginContainer}>
-          <Text style={styles.loginText}>¿Ya tienes cuenta? </Text>
-          <LinkButton text="Inicia sesión" onPress={() => router.push('/login')} />
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Modal Reutilizable de Alertas */}
       <CustomModal
@@ -352,132 +353,137 @@ export default function SignupScreen() {
         message={modalConfig.message}
         onClose={() => setModalVisible(false)}
       />
-    </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.secondary,
+    backgroundColor: COLORS.surface,
+  },
+  flexOne: {
+    flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
   },
-  header: {
+  content: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingBottom: 32,
+  },
+  headerTitleContainer: {
     alignItems: 'center',
-    marginBottom: spacing.xl,
+    marginVertical: 16,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: spacing.sm,
+  brandTitle: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: COLORS.primary,
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: 16,
-    color: colors.textLight,
+    fontSize: 15,
+    color: COLORS.textSecondary,
   },
   form: {
-    marginVertical: spacing.lg,
-  },
-  passwordStrengthContainer: {
-    marginTop: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  strengthBar: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
-  },
-  strengthSegment: {
-    flex: 1,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border,
-  },
-  strengthSegmentActive: {
-    backgroundColor: '#27ae60',
-  },
-  strengthLabel: {
-    fontSize: 12,
-    fontWeight: '600',
+    gap: 14,
   },
   roleLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.text,
-    marginTop: spacing.lg,
-    marginBottom: spacing.md,
+    color: COLORS.textPrimary,
+    marginTop: 6,
   },
   roleContainer: {
     flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
+    gap: 12,
   },
   roleButton: {
     flex: 1,
-    paddingVertical: spacing.md,
-    borderRadius: 8,
+    height: 48,
+    borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: colors.border,
+    borderColor: COLORS.border,
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.surface,
   },
   roleButtonActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   roleButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.text,
+    color: COLORS.textPrimary,
   },
   roleButtonTextActive: {
-    color: colors.secondary,
+    color: COLORS.surface,
   },
   termsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: spacing.lg,
+    marginVertical: 8,
   },
   checkbox: {
     width: 20,
     height: 20,
     borderRadius: 4,
     borderWidth: 2,
-    borderColor: colors.border,
-    marginRight: spacing.md,
+    borderColor: COLORS.textMuted,
+    marginRight: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkboxActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   checkmark: {
-    color: colors.secondary,
+    color: COLORS.surface,
     fontSize: 12,
     fontWeight: 'bold',
   },
   termsText: {
     fontSize: 13,
-    color: colors.textLight,
+    color: COLORS.textSecondary,
     flex: 1,
   },
   termsLink: {
-    color: colors.primary,
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+  signupButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    height: 54,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  signupButtonText: {
+    color: COLORS.surface,
+    fontSize: 16,
     fontWeight: '600',
   },
   loginContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: spacing.lg,
+    marginTop: 24,
   },
   loginText: {
-    color: colors.text,
-    fontSize: 14,
+    color: COLORS.textSecondary,
+    fontSize: 15,
+  },
+  loginLink: {
+    fontSize: 15,
+    color: COLORS.primary,
+    fontWeight: '700',
   },
 });

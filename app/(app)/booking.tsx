@@ -1,4 +1,3 @@
-// Pantalla de Reserva de Servicio (Conectada con Firestore y CustomModal)
 import React, { useState } from 'react';
 import {
   StyleSheet,
@@ -10,146 +9,78 @@ import {
   StatusBar,
   Platform,
   ActivityIndicator,
-  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-// Servicio de Firestore
 import { bookingService } from '../../src/data/firestore';
+import { COLORS } from '../../src/modules/shared/theme/colors';
+import { CustomModal, ModalType } from '../../src/modules/shared/components/CustomModal';
 
-const COLORS = {
-  background: '#F9F9FB',
-  surface: '#FFFFFF',
-  surfaceLow: '#F3F3F5',
-  surfaceVariant: '#E2E2E4',
-  textPrimary: '#1A1C1D',
-  textSecondary: '#4C4546',
-  primary: '#000000',
-  onPrimary: '#FFFFFF',
-  error: '#BA1A1A',
-  success: '#2E7D32',
-};
+// Submódulos de Booking
+import { WorkerCard } from '../../src/modules/booking/components/WorkerCard';
+import { DatePickerSection } from '../../src/modules/booking/components/DatePickerSection';
+import { TimePickerSection } from '../../src/modules/booking/components/TimePickerSection';
 
-// Fechas simulación (próximos 5 días)
 const DATES = [
-  { day: 'Lun', number: '24', full: '2026-08-24' },
-  { day: 'Mar', number: '25', full: '2026-08-25' },
-  { day: 'Mié', number: '26', full: '2026-08-26' },
-  { day: 'Jue', number: '27', full: '2026-08-27' },
-  { day: 'Vie', number: '28', full: '2026-08-28' },
+  { day: 'Lun', number: '07', full: '2026-09-07', status: 'available' },
+  { day: 'Mar', number: '08', full: '2026-09-08', status: 'available' },
+  { day: 'Mié', number: '09', full: '2026-09-09', status: 'available' },
+  { day: 'Jue', number: '10', full: '2026-09-10', status: 'available' },
+  { day: 'Vie', number: '11', full: '2026-09-11', status: 'disabled' },
 ];
 
-const TIME_SLOTS = ['09:00 AM', '11:00 AM', '02:00 PM', '04:00 PM', '06:00 PM'];
+const TIME_SLOTS = [
+  { time: '09:00 AM', label: 'Más solicitado', state: 'active' },
+  { time: '11:00 AM', label: 'Libre', state: 'available' },
+  { time: '02:00 PM', label: 'Libre', state: 'available' },
+  { time: '04:00 PM', label: 'Libre', state: 'available' },
+  { time: '06:00 PM', label: 'Último turno', state: 'available' },
+  { time: '07:30 PM', label: 'Ocupado', state: 'disabled' },
+];
 
-// Componente CustomModal
-interface CustomModalProps {
-  visible: boolean;
-  type?: 'success' | 'error' | 'info';
-  title: string;
-  message: string;
-  primaryButtonText?: string;
-  secondaryButtonText?: string;
-  onPrimaryPress: () => void;
-  onSecondaryPress?: () => void;
-}
-
-const CustomModal: React.FC<CustomModalProps> = ({
-  visible,
-  type = 'info',
-  title,
-  message,
-  primaryButtonText = 'Aceptar',
-  secondaryButtonText,
-  onPrimaryPress,
-  onSecondaryPress,
-}) => {
-  if (!visible) return null;
-
-  const getIcon = () => {
-    switch (type) {
-      case 'success':
-        return <Ionicons name="checkmark-circle" size={48} color={COLORS.success} />;
-      case 'error':
-        return <Ionicons name="alert-circle" size={48} color={COLORS.error} />;
-      default:
-        return <Ionicons name="information-circle" size={48} color={COLORS.primary} />;
-    }
-  };
-
-  return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={onPrimaryPress}>
-      <View style={modalStyles.overlay}>
-        <View style={modalStyles.container}>
-          <View style={modalStyles.iconContainer}>{getIcon()}</View>
-          <Text style={modalStyles.title}>{title}</Text>
-          <Text style={modalStyles.message}>{message}</Text>
-
-          <View style={modalStyles.buttonContainer}>
-            {secondaryButtonText && onSecondaryPress && (
-              <TouchableOpacity
-                style={[modalStyles.button, modalStyles.secondaryButton]}
-                onPress={onSecondaryPress}
-              >
-                <Text style={modalStyles.secondaryButtonText}>{secondaryButtonText}</Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity
-              style={[
-                modalStyles.button,
-                modalStyles.primaryButton,
-                type === 'error' && { backgroundColor: COLORS.error },
-              ]}
-              onPress={onPrimaryPress}
-            >
-              <Text style={modalStyles.primaryButtonText}>{primaryButtonText}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-};
+const QUICK_TAGS = ['+ Reparación urgente', '+ Revisión de instalación', '+ Cotización'];
 
 export default function BookingScreen() {
   const { workerId, workerName } = useLocalSearchParams<{ workerId?: string; workerName?: string }>();
 
   const [selectedDate, setSelectedDate] = useState(DATES[0].full);
-  const [selectedTime, setSelectedTime] = useState(TIME_SLOTS[0]);
+  const [selectedTime, setSelectedTime] = useState(TIME_SLOTS[0].time);
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Estado del CustomModal
   const [modalConfig, setModalConfig] = useState<{
     visible: boolean;
-    type: 'success' | 'error' | 'info';
+    type: ModalType;
     title: string;
     message: string;
-    primaryButtonText?: string;
-    secondaryButtonText?: string;
-    onPrimaryPress: () => void;
-    onSecondaryPress?: () => void;
+    buttonText: string;
+    onCloseAction: () => void;
   }>({
     visible: false,
     type: 'info',
     title: '',
     message: '',
-    onPrimaryPress: () => {},
+    buttonText: 'Aceptar',
+    onCloseAction: () => {},
   });
 
-  const hideModal = () => {
-    setModalConfig((prev) => ({ ...prev, visible: false }));
+  const hideModal = () => setModalConfig((prev) => ({ ...prev, visible: false }));
+
+  const handleQuickTagPress = (tag: string) => {
+    const cleanTag = tag.replace('+ ', '');
+    if (!description.includes(cleanTag)) {
+      setDescription((prev) => (prev ? `${prev}, ${cleanTag}` : cleanTag));
+    }
   };
 
   const handleConfirmBooking = async () => {
     try {
       setLoading(true);
-
       const bookingPayload = {
         workerId: workerId || '1',
-        workerName: workerName || 'Carlos Rodríguez',
+        workerName: workerName || 'Ing. Miguel Ángel Flores',
         date: selectedDate,
         time: selectedTime,
         description: description.trim(),
@@ -164,37 +95,25 @@ export default function BookingScreen() {
         await createFn(bookingPayload);
       }
 
-      // Éxito: abrir CustomModal con opciones de navegación
       setModalConfig({
         visible: true,
         type: 'success',
         title: '¡Reserva Solicitada!',
         message: `Has agendado con ${workerName || 'el profesional'} para el ${selectedDate} a las ${selectedTime}.`,
-        primaryButtonText: 'Ir al Chat',
-        secondaryButtonText: 'Volver al Inicio',
-        onPrimaryPress: () => {
+        buttonText: 'Ir al Chat',
+        onCloseAction: () => {
           hideModal();
           router.push(`/chat/${workerId || '1'}`);
         },
-        onSecondaryPress: () => {
-          hideModal();
-          router.replace('/');
-        },
       });
     } catch (error) {
-      console.error('Error al guardar la reserva:', error);
       setModalConfig({
         visible: true,
-        type: 'error',
+        type: 'danger',
         title: 'Error de reserva',
         message: 'No se pudo registrar tu solicitud. Por favor intenta nuevamente.',
-        primaryButtonText: 'Reintentar',
-        secondaryButtonText: 'Cancelar',
-        onPrimaryPress: () => {
-          hideModal();
-          handleConfirmBooking();
-        },
-        onSecondaryPress: hideModal,
+        buttonText: 'Entendido',
+        onCloseAction: hideModal,
       });
     } finally {
       setLoading(false);
@@ -207,181 +126,97 @@ export default function BookingScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={22} color={COLORS.primary} />
+        <TouchableOpacity style={styles.iconCircleBtn} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={18} color={COLORS.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Agendar Servicio</Text>
-        <View style={{ width: 40 }} />
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.stepIndicator}>PASO 2 DE 3</Text>
+          <Text style={styles.headerTitle}>Agendar Servicio</Text>
+        </View>
+        <TouchableOpacity style={styles.iconCircleBtn}>
+          <Ionicons name="information-circle-outline" size={20} color={COLORS.textPrimary} />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.progressBarTrack}>
+        <View style={styles.progressBarFill} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Info del Profesional */}
-        <View style={styles.workerInfoCard}>
-          <Ionicons name="person-circle-outline" size={40} color={COLORS.primary} />
-          <View>
-            <Text style={styles.workerInfoLabel}>Trabajador seleccionado</Text>
-            <Text style={styles.workerInfoName}>{workerName || 'Carlos Rodríguez'}</Text>
+        <WorkerCard workerName={workerName} />
+
+        <DatePickerSection
+          dates={DATES}
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+        />
+
+        <TimePickerSection
+          timeSlots={TIME_SLOTS}
+          selectedTime={selectedTime}
+          onSelectTime={setSelectedTime}
+        />
+
+        {/* Sección Notas */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>
+              Detalles del trabajo <Text style={styles.optionalText}>(Opcional)</Text>
+            </Text>
+            <Text style={styles.charCountText}>Máx. 250 caracteres</Text>
           </View>
-        </View>
 
-        {/* Seleccionar Fecha */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Selecciona la fecha</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateRow}>
-            {DATES.map((item) => {
-              const isSelected = selectedDate === item.full;
-              return (
-                <TouchableOpacity
-                  key={item.full}
-                  style={[styles.dateCard, isSelected && styles.selectedDateCard]}
-                  onPress={() => setSelectedDate(item.full)}
-                >
-                  <Text style={[styles.dayText, isSelected && styles.selectedText]}>{item.day}</Text>
-                  <Text style={[styles.numberText, isSelected && styles.selectedText]}>{item.number}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-
-        {/* Seleccionar Horario */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Selecciona el horario</Text>
-          <View style={styles.timeGrid}>
-            {TIME_SLOTS.map((time) => {
-              const isSelected = selectedTime === time;
-              return (
-                <TouchableOpacity
-                  key={time}
-                  style={[styles.timeChip, isSelected && styles.selectedTimeChip]}
-                  onPress={() => setSelectedTime(time)}
-                >
-                  <Text style={[styles.timeText, isSelected && styles.selectedTimeText]}>{time}</Text>
-                </TouchableOpacity>
-              );
-            })}
+          <View style={styles.quickTagsRow}>
+            {QUICK_TAGS.map((tag, idx) => (
+              <TouchableOpacity key={idx} style={styles.chipButton} onPress={() => handleQuickTagPress(tag)}>
+                <Text style={styles.chipText}>{tag}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
-        </View>
 
-        {/* Detalles adicionales */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Detalles del trabajo (Opcional)</Text>
-          <TextInput
-            style={styles.notesInput}
-            placeholder="Describe brevemente lo que necesitas reparar o instalar..."
-            placeholderTextColor={COLORS.textSecondary}
-            multiline
-            numberOfLines={4}
-            textAlignVertical="top"
-            value={description}
-            onChangeText={setDescription}
-          />
+          <View style={styles.notesBox}>
+            <TextInput
+              style={styles.notesInput}
+              placeholder="Describe brevemente lo que necesitas reparar o instalar..."
+              placeholderTextColor={COLORS.textMuted}
+              multiline
+              maxLength={250}
+              numberOfLines={4}
+              textAlignVertical="top"
+              value={description}
+              onChangeText={setDescription}
+            />
+          </View>
         </View>
       </ScrollView>
 
-      {/* Botón Flotante */}
+      {/* Footer */}
       <View style={styles.footer}>
         <TouchableOpacity
-          style={styles.confirmButton}
-          activeOpacity={0.8}
+          style={styles.primaryBtn}
+          activeOpacity={0.88}
           onPress={handleConfirmBooking}
           disabled={loading}
         >
           {loading ? (
-            <ActivityIndicator color={COLORS.onPrimary} />
+            <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <>
-              <Text style={styles.confirmButtonText}>Confirmar y Solicitar</Text>
-              <Ionicons name="checkmark-circle-outline" size={20} color={COLORS.onPrimary} />
-            </>
+            <Text style={styles.primaryBtnText}>Confirmar y Solicitar</Text>
           )}
         </TouchableOpacity>
       </View>
 
-      {/* Modal Personalizado */}
       <CustomModal
         visible={modalConfig.visible}
         type={modalConfig.type}
         title={modalConfig.title}
         message={modalConfig.message}
-        primaryButtonText={modalConfig.primaryButtonText}
-        secondaryButtonText={modalConfig.secondaryButtonText}
-        onPrimaryPress={modalConfig.onPrimaryPress}
-        onSecondaryPress={modalConfig.onSecondaryPress}
+        buttonText={modalConfig.buttonText}
+        onClose={modalConfig.onCloseAction}
       />
     </SafeAreaView>
   );
 }
-
-// Estilos del Modal
-const modalStyles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  container: {
-    width: '100%',
-    backgroundColor: COLORS.surface,
-    borderRadius: 20,
-    padding: 24,
-    alignItems: 'center',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-  iconContainer: {
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  message: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 20,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    width: '100%',
-  },
-  button: {
-    flex: 1,
-    height: 44,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  primaryButton: {
-    backgroundColor: COLORS.primary,
-  },
-  secondaryButton: {
-    backgroundColor: COLORS.surfaceLow,
-    borderWidth: 1,
-    borderColor: COLORS.surfaceVariant,
-  },
-  primaryButtonText: {
-    color: COLORS.onPrimary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  secondaryButtonText: {
-    color: COLORS.textPrimary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-});
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -394,143 +229,65 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 10,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.surfaceLow,
+  iconCircleBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: COLORS.cardBackground,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.primary,
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingBottom: 100,
-  },
-  workerInfoCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: COLORS.surface,
+  headerTitleContainer: { alignItems: 'center' },
+  stepIndicator: { fontSize: 9, fontWeight: '700', color: COLORS.textMuted, letterSpacing: 1, marginBottom: 2 },
+  headerTitle: { fontSize: 17, fontWeight: '800', color: COLORS.textPrimary },
+  progressBarTrack: { height: 3, backgroundColor: COLORS.border, width: '100%', marginBottom: 4 },
+  progressBarFill: { height: '100%', width: '66%', backgroundColor: COLORS.primary },
+  content: { paddingHorizontal: 20, paddingBottom: 110 },
+  section: { marginTop: 20 },
+  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 10 },
+  sectionTitle: { fontSize: 15, fontWeight: '800', color: COLORS.textPrimary },
+  optionalText: { fontSize: 12, fontWeight: '400', color: COLORS.textMuted },
+  charCountText: { fontSize: 10, color: COLORS.textMuted },
+  quickTagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+  chipButton: {
+    backgroundColor: COLORS.cardBackground,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 16,
+  },
+  chipText: { fontSize: 11, fontWeight: '600', color: COLORS.textPrimary },
+  notesBox: {
+    backgroundColor: COLORS.cardBackground,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     padding: 14,
-    borderWidth: 1,
-    borderColor: COLORS.surfaceVariant,
-    marginVertical: 12,
   },
-  workerInfoLabel: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-  workerInfoName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-  },
-  section: {
-    marginTop: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.primary,
-    marginBottom: 12,
-  },
-  dateRow: {
-    gap: 10,
-  },
-  dateCard: {
-    width: 64,
-    height: 74,
-    borderRadius: 16,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.surfaceVariant,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  selectedDateCard: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  dayText: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    fontWeight: '500',
-  },
-  numberText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginTop: 2,
-  },
-  selectedText: {
-    color: COLORS.onPrimary,
-  },
-  timeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  timeChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.surfaceVariant,
-  },
-  selectedTimeChip: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  timeText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-  },
-  selectedTimeText: {
-    color: COLORS.onPrimary,
-  },
-  notesInput: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: COLORS.surfaceVariant,
-    padding: 14,
-    fontSize: 14,
-    color: COLORS.textPrimary,
-    height: 100,
-  },
+  notesInput: { fontSize: 13, color: COLORS.textPrimary, height: 75 },
   footer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.cardBackground,
     borderTopWidth: 1,
-    borderTopColor: COLORS.surfaceVariant,
+    borderTopColor: COLORS.border,
     paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 28 : 16,
   },
-  confirmButton: {
+  primaryBtn: {
     backgroundColor: COLORS.primary,
-    borderRadius: 14,
-    height: 50,
-    flexDirection: 'row',
+    borderRadius: 20,
+    height: 54,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
   },
-  confirmButtonText: {
-    color: COLORS.onPrimary,
-    fontSize: 16,
-    fontWeight: '700',
-  },
+  primaryBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
 });

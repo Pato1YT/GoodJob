@@ -7,7 +7,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   KeyboardAvoidingView,
@@ -18,14 +17,20 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
+
 import { useAuth } from '../../src/utils/useAuth';
-import { CustomModal, ModalType } from '../../src/components/CustomModal';
+import { CustomModal, ModalType } from '../../src/modules/shared/components/CustomModal';
 import { getSpanishAuthErrorMessage } from '../../src/utils/firebaseErrors';
+import { COLORS } from '../../src/modules/shared/theme/colors';
+
+// Componentes modulares de Auth
+import { AuthInput } from '../../src/modules/auth/components/AuthInput';
+import { AuthHeader } from '../../src/modules/auth/components/AuthHeader';
 
 // Helper para validar formato de correo
 const validateEmail = (email: string): boolean => {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return re.test(email);
+  return re.test(email.trim());
 };
 
 export default function LoginScreen() {
@@ -53,13 +58,15 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     try {
+      const trimmedEmail = email.trim();
+
       // Validaciones de formulario
-      if (!email.trim()) {
+      if (!trimmedEmail) {
         showErrorModal('Por favor ingresa tu correo');
         return;
       }
 
-      if (!validateEmail(email)) {
+      if (!validateEmail(trimmedEmail)) {
         showErrorModal('Por favor ingresa un correo válido');
         return;
       }
@@ -70,7 +77,7 @@ export default function LoginScreen() {
       }
 
       // Llamada al método de autenticación original
-      await signIn(email, password);
+      await signIn(trimmedEmail, password);
     } catch (err: any) {
       // Traducir código de error o mensaje devuelto
       const rawCode = err?.code || (err instanceof Error ? err.message : '');
@@ -83,7 +90,7 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flexOne}
       >
         <ScrollView
@@ -92,17 +99,7 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
         >
           {/* Header Superior con Botón Atrás y Título Centrado */}
-          <View style={styles.header}>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => router.back()}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <MaterialIcons name="arrow-back" size={24} color="#000000" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Inicio de Sesión</Text>
-            <View style={styles.headerPlaceholder} />
-          </View>
+          <AuthHeader title="Inicio de Sesión" onBackPress={() => router.back()} />
 
           <View style={styles.content}>
             {/* Título Principal y Subtítulo */}
@@ -114,53 +111,27 @@ export default function LoginScreen() {
             {/* Formulario de Entrada */}
             <View style={styles.form}>
               {/* Input de Correo Electrónico */}
-              <View style={styles.inputContainer}>
-                <MaterialIcons
-                  name="mail-outline"
-                  size={20}
-                  color="#666666"
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Correo electrónico"
-                  placeholderTextColor="#757575"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  editable={!loading}
-                />
-              </View>
+              <AuthInput
+                iconName="mail-outline"
+                placeholder="Correo electrónico"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                editable={!loading}
+              />
 
               {/* Input de Contraseña con Toggle de Visibilidad */}
-              <View style={styles.inputContainer}>
-                <MaterialIcons
-                  name="lock-outline"
-                  size={20}
-                  color="#666666"
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Contraseña"
-                  placeholderTextColor="#757575"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPassword}
-                  editable={!loading}
-                />
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  style={styles.eyeIcon}
-                >
-                  <MaterialIcons
-                    name={showPassword ? 'visibility' : 'visibility-off'}
-                    size={20}
-                    color="#666666"
-                  />
-                </TouchableOpacity>
-              </View>
+              <AuthInput
+                iconName="lock-outline"
+                placeholder="Contraseña"
+                value={password}
+                onChangeText={setPassword}
+                isPassword
+                showPassword={showPassword}
+                onTogglePassword={() => setShowPassword(!showPassword)}
+                editable={!loading}
+              />
 
               {/* Enlace Olvidaste tu Contraseña */}
               <TouchableOpacity
@@ -176,17 +147,17 @@ export default function LoginScreen() {
               <TouchableOpacity
                 style={[
                   styles.loginButton,
-                  (loading || !email || !password) && styles.loginButtonDisabled,
+                  (loading || !email.trim() || !password) && styles.loginButtonDisabled,
                 ]}
                 onPress={handleLogin}
                 activeOpacity={0.8}
-                disabled={loading || !email || !password}
+                disabled={loading || !email.trim() || !password}
               >
                 {loading ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <ActivityIndicator size="small" color={COLORS.surface} />
                 ) : (
                   <>
-                    <MaterialIcons name="check" size={20} color="#FFFFFF" />
+                    <MaterialIcons name="check" size={20} color={COLORS.surface} />
                     <Text style={styles.loginButtonText}>Iniciar Sesión</Text>
                   </>
                 )}
@@ -218,35 +189,13 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.surface,
   },
   flexOne: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    height: 56,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 20,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#000000',
-  },
-  headerPlaceholder: {
-    width: 40,
   },
   content: {
     flex: 1,
@@ -261,35 +210,16 @@ const styles = StyleSheet.create({
   brandTitle: {
     fontSize: 38,
     fontWeight: '800',
-    color: '#000000',
+    color: COLORS.primary,
     marginBottom: 6,
     letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 15,
-    color: '#666666',
+    color: COLORS.textSecondary,
   },
   form: {
     gap: 16,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F3F3F3',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    height: 56,
-  },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    fontSize: 15,
-    color: '#000000',
-  },
-  eyeIcon: {
-    padding: 4,
   },
   forgotPasswordContainer: {
     alignSelf: 'flex-end',
@@ -299,10 +229,10 @@ const styles = StyleSheet.create({
   forgotPasswordText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#000000',
+    color: COLORS.primary,
   },
   loginButton: {
-    backgroundColor: '#000000',
+    backgroundColor: COLORS.primary,
     borderRadius: 12,
     height: 54,
     flexDirection: 'row',
@@ -315,7 +245,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   loginButtonText: {
-    color: '#FFFFFF',
+    color: COLORS.surface,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -327,11 +257,11 @@ const styles = StyleSheet.create({
   },
   signupText: {
     fontSize: 15,
-    color: '#666666',
+    color: COLORS.textSecondary,
   },
   signupLink: {
     fontSize: 15,
-    color: '#000000',
+    color: COLORS.primary,
     fontWeight: '700',
   },
 });

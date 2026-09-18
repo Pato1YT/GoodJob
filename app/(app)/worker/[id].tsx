@@ -75,10 +75,12 @@ export default function WorkerDetailScreen() {
     // Obtener nombre formateado desde los campos de Firebase
     const name = `${w?.firstName || ''} ${w?.lastName || ''}`.trim() || w?.userNameSnapshot || 'Profesional';
 
+    // Redirección corregida hacia la pantalla de reserva principal
     router.push({
-      pathname: '/worker/booking' as any,
+      pathname: '/booking' as any,
       params: { 
-        workerId: worker.id, 
+        workerId: worker.id || id, 
+        id: worker.id || id,
         workerName: name
       },
     });
