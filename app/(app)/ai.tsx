@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,9 +8,9 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 const COLORS = {
@@ -37,17 +37,27 @@ const SUGGESTIONS = [
   'Consejos para remodelar mi baño',
 ];
 
+const getFormattedTime = () => {
+  const now = new Date();
+  return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
 export default function AIScreen() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      text: '¡Hola! Soy tu asistente de GoodJobs IA. ¿En qué servicio o cotización te puedo ayudar hoy?',
-      sender: 'ai',
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+
+  // Inicialización segura del primer mensaje al montar el componente
+  useEffect(() => {
+    setMessages([
+      {
+        id: '1',
+        text: '¡Hola! Soy tu asistente de GoodJobs IA. ¿En qué servicio o cotización te puedo ayudar hoy?',
+        sender: 'ai',
+        timestamp: getFormattedTime(),
+      },
+    ]);
+  }, []);
 
   const sendMessage = (textToSend?: string) => {
     const text = textToSend || inputText;
@@ -57,7 +67,7 @@ export default function AIScreen() {
       id: Date.now().toString(),
       text: text.trim(),
       sender: 'user',
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      timestamp: getFormattedTime(),
     };
 
     setMessages((prev) => [...prev, userMessage]);
@@ -69,7 +79,7 @@ export default function AIScreen() {
         id: (Date.now() + 1).toString(),
         text: `Entendido. Con base en tu consulta "${text}", he encontrado opciones y recomendaciones óptimas en GoodJobs. ¿Deseas que busque un especialista disponible en tu área?`,
         sender: 'ai',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        timestamp: getFormattedTime(),
       };
       setMessages((prev) => [...prev, aiResponse]);
       setIsTyping(false);

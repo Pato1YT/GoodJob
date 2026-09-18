@@ -10,10 +10,11 @@ import {
   ScrollView,
   Image,
   Switch,
-  SafeAreaView,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const COLORS = {
   primary: '#000000',
@@ -44,7 +45,21 @@ export default function ProfileScreen() {
   const handleSignOut = () => {
     Alert.alert('Cerrar Sesión', '¿Estás seguro de que deseas salir?', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Cerrar sesión', style: 'destructive' },
+      {
+        text: 'Cerrar sesión',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            // Limpia todos los datos guardados de la sesión
+            await AsyncStorage.clear();
+            
+            // Redirige a la pantalla de inicio de sesión
+            router.replace('/(auth)/login');
+          } catch (error) {
+            Alert.alert('Error', 'No se pudo cerrar la sesión.');
+          }
+        },
+      },
     ]);
   };
 
@@ -242,7 +257,6 @@ export default function ProfileScreen() {
     </SafeAreaView>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {
