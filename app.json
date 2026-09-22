@@ -29,7 +29,8 @@
           "origin": false,
           "asyncRoutes": false
         }
-      ]
+      ],
+      "expo-font"
     ]
   }
 }

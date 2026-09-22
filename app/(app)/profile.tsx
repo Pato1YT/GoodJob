@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../../src/utils/useAuth';
 
 const COLORS = {
   primary: '#000000',
@@ -31,6 +32,7 @@ const COLORS = {
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { logout } = useAuth();
   const [fullName, setFullName] = useState('Alex Morgan');
   const [email, setEmail] = useState('alex.morgan@example.com');
   const [phone, setPhone] = useState('+1 (555) 019-2837');
@@ -50,11 +52,8 @@ export default function ProfileScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            // Limpia todos los datos guardados de la sesión
-            await AsyncStorage.clear();
+            await logout();
             
-            // Redirige a la pantalla de inicio de sesión
-            router.replace('/(auth)/login');
           } catch (error) {
             Alert.alert('Error', 'No se pudo cerrar la sesión.');
           }
