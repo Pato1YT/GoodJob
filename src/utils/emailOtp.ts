@@ -8,7 +8,7 @@ function generaCodigo(): string{
 
 }
 async function enviarCorreo(email: string, codigo:string) {
-    const response = await fetch('https:/api.emailjs.com/api/v1.0/email/send',{
+    const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
         method: 'POST',
         headers: {'content-Type': 'application/json'},
         body: JSON.stringify({
