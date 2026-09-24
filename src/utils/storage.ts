@@ -54,6 +54,23 @@ export const tokenStorage = {
     }
   },
 
+  async saveRefreshToken(token: string) {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, token);
+    } catch (error) {
+      console.error('Error saving refresh token:', error);
+    }
+  },
+
+  async getRefreshToken() {
+    try {
+      return await AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+    } catch (error) {
+      console.error('Error getting refresh token:', error);
+      return null;
+    }
+  },
+
   async clear() {
     try {
       await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);

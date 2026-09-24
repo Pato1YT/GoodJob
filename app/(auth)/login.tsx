@@ -72,7 +72,7 @@ export default function LoginScreen() {
         setPendingUid(userCredential.user.uid);
         router.push('/(auth)/two_step_verification');
       } else {
-        router.replace('/(app)');
+        router.replace('/(tabs)');
       }
     } catch (err: any) {
       const rawCode = err?.code || (err instanceof Error ? err.message : '');

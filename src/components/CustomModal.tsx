@@ -17,7 +17,9 @@ interface CustomModalProps {
   title?: string;
   message: string;
   buttonText?: string;
+  secondaryButtonText?: string;
   onClose: () => void;
+  onSecondaryPress?: () => void;
 }
 
 const TYPE_CONFIG = {
@@ -54,7 +56,9 @@ export const CustomModal: React.FC<CustomModalProps> = ({
   title,
   message,
   buttonText = 'Entendido',
+  secondaryButtonText,
   onClose,
+  onSecondaryPress,
 }) => {
   const config = TYPE_CONFIG[type] || TYPE_CONFIG.primary;
 
@@ -78,14 +82,29 @@ export const CustomModal: React.FC<CustomModalProps> = ({
               <Text style={styles.title}>{title || config.defaultTitle}</Text>
               <Text style={styles.message}>{message}</Text>
 
-              {/* Botón Principal */}
-              <TouchableOpacity
-                style={[styles.button, { backgroundColor: config.color }]}
-                activeOpacity={0.8}
-                onPress={onClose}
-              >
-                <Text style={styles.buttonText}>{buttonText}</Text>
-              </TouchableOpacity>
+              {/* Botones */}
+              <View style={styles.buttonGroup}>
+                {secondaryButtonText && (
+                  <TouchableOpacity
+                    style={[styles.button, styles.secondaryButton]}
+                    activeOpacity={0.8}
+                    onPress={onSecondaryPress || onClose}
+                  >
+                    <Text style={styles.secondaryButtonText}>{secondaryButtonText}</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={[
+                    styles.button,
+                    secondaryButtonText ? styles.flexButton : { width: '100%' },
+                    { backgroundColor: config.color },
+                  ]}
+                  activeOpacity={0.8}
+                  onPress={onClose}
+                >
+                  <Text style={styles.buttonText}>{buttonText}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </TouchableWithoutFeedback>
         </View>
@@ -138,11 +157,28 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   button: {
-    width: '100%',
     height: 46,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  buttonGroup: {
+    width: '100%',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  flexButton: {
+    flex: 1,
+  },
+  secondaryButton: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+  },
+  secondaryButtonText: {
+    color: '#374151',
+    fontSize: 15,
+    fontWeight: '600',
   },
   buttonText: {
     color: '#FFFFFF',
