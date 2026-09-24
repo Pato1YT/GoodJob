@@ -100,7 +100,7 @@ export default function HomeScreen() {
   };
 
   const handleSettings = () => {
-    router.push('/(app)/profile');
+    router.push('/(tabs)/profile');
   };
 
   const handleModalClose = () => {

@@ -85,7 +85,7 @@ export const useAuth = () => {
       await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
       setUser(newUser);
       await userStorage.save(newUser);
-      router.replace('/(app)');
+      router.replace('/(tabs)');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Sign up failed';
       setError(errorMessage);

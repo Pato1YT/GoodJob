@@ -165,7 +165,7 @@ export default function SignupScreen() {
         role: formData.role,
       });
 
-      router.replace('/(app)');
+      router.replace('/(tabs)');
     } catch (err: any) {
       // Traducir código de error o mensaje devuelto
       const rawCode = err?.code || (err instanceof Error ? err.message : '');

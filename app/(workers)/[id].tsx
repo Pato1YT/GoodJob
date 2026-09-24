@@ -17,8 +17,8 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 // Importación de servicios de Firestore y tipos
-import { workerService, reviewService } from '../../../src/data/firestore';
-import { Worker, Review } from '../../../src/types';
+import { workerService, reviewService } from '../../src/data/firestore';
+import { Worker, Review } from '../../src/types';
 
 // --- Paleta de colores Monochrome Premium ---
 const COLORS = {
@@ -32,6 +32,9 @@ const COLORS = {
   onPrimary: '#FFFFFF',
   error: '#BA1A1A',
 };
+
+const DEFAULT_AVATAR =
+  'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=400';
 
 export default function WorkerDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -76,7 +79,7 @@ export default function WorkerDetailScreen() {
     const name = `${w?.firstName || ''} ${w?.lastName || ''}`.trim() || w?.userNameSnapshot || 'Profesional';
 
     router.push({
-      pathname: '/worker/booking' as any,
+      pathname: '/booking' as any,
       params: { 
         workerId: worker.id, 
         workerName: name
@@ -147,7 +150,7 @@ export default function WorkerDetailScreen() {
         {/* --- Card Principal de Usuario --- */}
         <View style={styles.profileHeaderCard}>
           <Image 
-            source={{ uri: w.avatarUrl || w.photoURL || 'https://via.placeholder.com/150' }} 
+            source={{ uri: w.userPhotoSnapshot || w.photoUrl || w.avatarUrl || w.photoURL || DEFAULT_AVATAR }} 
             style={styles.avatar} 
           />
           <Text style={styles.workerName}>{fullName}</Text>

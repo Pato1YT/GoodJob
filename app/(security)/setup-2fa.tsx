@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { useRouter } from 'expo-router';
 import { CustomInput, CustomButton, colors, spacing } from '../../src/components/common';
 import { CustomModal, ModalType } from '../../src/components/CustomModal';
 import { enviarCodigoOTP, verificarCodigoOTP, activar2FA } from '../../src/utils/emailOtp';
 import { auth } from '../../src/config/firebase';
-import {useAuth} from '../../src/utils/useAuth';
 
 type Step = 'inicio' | 'confirmar' | 'listo';
 
 export default function Setup2FAScreen() {
-  const {logout} = useAuth();
+  const router = useRouter();
   const [step, setStep] = useState<Step>('inicio');
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -119,9 +119,9 @@ export default function Setup2FAScreen() {
               
             </Text>
             <CustomButton
-            title = "Ir al inicio de sesíon"
-            onPress={logout}
-            size="large"
+              title="Volver al perfil"
+              onPress={() => router.replace('/(tabs)/profile')}
+              size="large"
             />
           </>
         )}

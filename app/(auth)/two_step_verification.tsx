@@ -51,7 +51,7 @@ export default function TwoFactorAuthScreen() {
 
       if (esValido) {
         clearPendingUid();
-        router.replace('/(app)');
+        router.replace('/(tabs)');
       } else {
         showErrorModal('El código es inválido o ya expiró');
       }
