@@ -1,4 +1,4 @@
-// Pantalla de Búsqueda y Filtros (Conectada con Firestore y CustomModal)
+// Pantalla de Búsqueda y Filtros - Conectada a Firestore con diseño armónico
 import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
@@ -11,15 +11,17 @@ import {
   StatusBar,
   Platform,
   ActivityIndicator,
-  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-// Importación del servicio de Firestore y tipos
-import { workerService } from '../../src/data/firestore';
-import { Worker } from '../../src/types';
+import { workerService, categoryService, favoriteService } from '../../src/data/firestore';
+import { Worker, Category } from '../../src/types';
+import { CustomModal, ModalType } from '../../src/components/CustomModal';
+import { auth } from '../../src/config/firebase';
+import { getWorkerPhoto } from '../../src/utils/avatarUtils';
+import { useThemeStore } from '../../src/utils/themeStore';
 
 const COLORS = {
   background: '#F9F9FB',
@@ -33,218 +35,210 @@ const COLORS = {
   error: '#BA1A1A',
 };
 
-const CATEGORIES = ['Todos', 'Fontanería', 'Limpieza', 'Jardinería', 'Electricidad'];
+const DEFAULT_AVATAR =
+  'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=400';
 
-// Componente CustomModal
-interface CustomModalProps {
-  visible: boolean;
-  type?: 'success' | 'error' | 'info';
-  title: string;
-  message: string;
-  primaryButtonText?: string;
-  secondaryButtonText?: string;
-  onPrimaryPress: () => void;
-  onSecondaryPress?: () => void;
-}
+export default function SearchScreen() {
+  const isDark = useThemeStore((s) => s.isDark);
+  const themeColors = useThemeStore((s) => s.colors);
 
-const CustomModal: React.FC<CustomModalProps> = ({
-  visible,
-  type = 'info',
-  title,
-  message,
-  primaryButtonText = 'Aceptar',
-  secondaryButtonText,
-  onPrimaryPress,
-  onSecondaryPress,
-}) => {
-  if (!visible) return null;
+  const params = useLocalSearchParams<{ category?: string }>();
+  const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
+  const [categories, setCategories] = useState<string[]>(['Todos']);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const getIcon = () => {
-    switch (type) {
-      case 'success':
-        return <Ionicons name="checkmark-circle" size={48} color="#2E7D32" />;
-      case 'error':
-        return <Ionicons name="alert-circle" size={48} color={COLORS.error} />;
-      default:
-        return <Ionicons name="information-circle" size={48} color={COLORS.primary} />;
+  // Estados de datos
+  const [professionals, setProfessionals] = useState<Worker[]>([]);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  // Estado para CustomModal
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState<{
+    type: ModalType;
+    message: string;
+    onCloseAction?: () => void;
+  }>({
+    type: 'danger',
+    message: '',
+  });
+
+  const showModal = (type: ModalType, message: string, onCloseAction?: () => void) => {
+    setModalConfig({ type, message, onCloseAction });
+    setModalVisible(true);
+  };
+
+  const handleModalClose = () => {
+    setModalVisible(false);
+    if (modalConfig.onCloseAction) {
+      modalConfig.onCloseAction();
     }
   };
 
-  return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={onPrimaryPress}>
-      <View style={modalStyles.overlay}>
-        <View style={modalStyles.container}>
-          <View style={modalStyles.iconContainer}>{getIcon()}</View>
-
-          <Text style={modalStyles.title}>{title}</Text>
-          <Text style={modalStyles.message}>{message}</Text>
-
-          <View style={modalStyles.buttonContainer}>
-            {secondaryButtonText && onSecondaryPress && (
-              <TouchableOpacity
-                style={[modalStyles.button, modalStyles.secondaryButton]}
-                onPress={onSecondaryPress}
-              >
-                <Text style={modalStyles.secondaryButtonText}>{secondaryButtonText}</Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity
-              style={[
-                modalStyles.button,
-                modalStyles.primaryButton,
-                type === 'error' && { backgroundColor: COLORS.error },
-              ]}
-              onPress={onPrimaryPress}
-            >
-              <Text style={modalStyles.primaryButtonText}>{primaryButtonText}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-};
-
-export default function SearchScreen() {
-  const params = useLocalSearchParams<{ category?: string }>();
-  const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // Estados para los trabajadores desde Firestore
-  const [professionals, setProfessionals] = useState<Worker[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-
-  // Estado para el CustomModal
-  const [modalConfig, setModalConfig] = useState<{
-    visible: boolean;
-    type: 'success' | 'error' | 'info';
-    title: string;
-    message: string;
-    primaryButtonText?: string;
-    secondaryButtonText?: string;
-    onPrimaryPress: () => void;
-    onSecondaryPress?: () => void;
-  }>({
-    visible: false,
-    type: 'info',
-    title: '',
-    message: '',
-    onPrimaryPress: () => {},
-  });
-
-  const hideModal = () => {
-    setModalConfig((prev) => ({ ...prev, visible: false }));
-  };
-
-  // 1. Sincronizar parámetro de categoría inicial recibido por la URL
+  // 1. Cargar categorías dinámicas y trabajadores al montar
   useEffect(() => {
-    if (params.category && CATEGORIES.includes(params.category)) {
+    loadInitialData();
+  }, []);
+
+  // 2. Sincronizar parámetro de categoría inicial si viene en la navegación
+  useEffect(() => {
+    if (params.category) {
       setSelectedCategory(params.category);
     }
   }, [params.category]);
 
-  // 2. Cargar profesionales de Firestore al montar el componente
-  useEffect(() => {
-    fetchProfessionals();
-  }, []);
-
-  const fetchProfessionals = async () => {
+  const loadInitialData = async () => {
     try {
       setLoading(true);
-      const service = workerService as any;
-      const getFn = service.getAll || service.getWorkers || service.getAllWorkers;
 
-      if (typeof getFn === 'function') {
-        const data = await getFn();
-        setProfessionals(data || []);
-      } else {
-        setProfessionals([]);
+      // Cargar categorías reales de Firestore
+      try {
+        const catDocs = await categoryService.getAll();
+        if (catDocs && catDocs.length > 0) {
+          const catNames = ['Todos', ...catDocs.map((c) => c.name)];
+          setCategories(catNames);
+        } else {
+          setCategories(['Todos', 'Fontanería', 'Limpieza', 'Jardinería', 'Electricidad', 'Pintura']);
+        }
+      } catch (err) {
+        console.warn('Error loading categories:', err);
+        setCategories(['Todos', 'Fontanería', 'Limpieza', 'Jardinería', 'Electricidad', 'Pintura']);
+      }
+
+      // Cargar trabajadores disponibles
+      const workersData = await workerService.getAvailable(50);
+      setProfessionals(workersData || []);
+
+      // Cargar favoritos del usuario actual
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        try {
+          const userFavs = await favoriteService.getByUserId(currentUser.uid);
+          setFavorites(userFavs.map((f) => f.workerId));
+        } catch (favErr) {
+          console.warn('Error loading favorites in search:', favErr);
+        }
       }
     } catch (error) {
-      console.error('Error al obtener trabajadores de Firestore:', error);
-      setProfessionals([]);
-      
-      setModalConfig({
-        visible: true,
-        type: 'error',
-        title: 'Error de conexión',
-        message: 'No se pudieron cargar los profesionales. Por favor, verifica tu conexión a internet e inténtalo de nuevo.',
-        primaryButtonText: 'Reintentar',
-        secondaryButtonText: 'Cancelar',
-        onPrimaryPress: () => {
-          hideModal();
-          fetchProfessionals();
-        },
-        onSecondaryPress: hideModal,
-      });
+      console.error('Error al cargar datos en búsqueda:', error);
+      showModal(
+        'danger',
+        'No se pudieron cargar los profesionales. Por favor verifica tu conexión.',
+        () => loadInitialData()
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  // 3. Filtrado dinámico local según búsqueda y categoría seleccionada
+  // Alternar favorito
+  const toggleFavorite = async (pro: Worker) => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      showModal('info', 'Debes iniciar sesión para guardar favoritos.');
+      return;
+    }
+
+    const isFav = favorites.includes(pro.id);
+    // Optimista
+    setFavorites((prev) =>
+      isFav ? prev.filter((id) => id !== pro.id) : [...prev, pro.id]
+    );
+
+    try {
+      await favoriteService.toggle(currentUser.uid, pro);
+    } catch (error) {
+      console.error('Error al cambiar favorito en búsqueda:', error);
+      // Revertir
+      setFavorites((prev) =>
+        isFav ? [...prev, pro.id] : prev.filter((id) => id !== pro.id)
+      );
+    }
+  };
+
+  // 3. Filtrado dinámico por categoría y por texto (nombre, bio, categoría, habilidades)
   const filteredProfessionals = professionals.filter((pro) => {
     const w = pro as any;
-
-    const proName = `${w.firstName || ''} ${w.lastName || ''}`.trim() || w.userNameSnapshot || '';
-    const proCategory = w.category || w.title || '';
-    const proRole = w.roleTitle || w.title || w.category || '';
+    const name = `${w.firstName || ''} ${w.lastName || ''}`.trim() || w.userNameSnapshot || '';
+    const category = w.category || w.roleTitle || w.title || '';
+    const bio = w.bio || '';
+    const skills = Array.isArray(w.skills) ? w.skills.join(' ') : '';
 
     const matchesCategory =
       selectedCategory === 'Todos' ||
-      proCategory.toLowerCase() === selectedCategory.toLowerCase();
+      category.toLowerCase().includes(selectedCategory.toLowerCase()) ||
+      bio.toLowerCase().includes(selectedCategory.toLowerCase());
 
+    const queryLower = searchQuery.toLowerCase().trim();
     const matchesSearch =
-      proName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      proRole.toLowerCase().includes(searchQuery.toLowerCase());
+      !queryLower ||
+      name.toLowerCase().includes(queryLower) ||
+      category.toLowerCase().includes(queryLower) ||
+      bio.toLowerCase().includes(queryLower) ||
+      skills.toLowerCase().includes(queryLower);
 
     return matchesCategory && matchesSearch;
   });
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+    <SafeAreaView style={[styles.safeArea, isDark && { backgroundColor: themeColors.background }]}>
+      <StatusBar barStyle={themeColors.statusBar} backgroundColor={themeColors.background} />
 
       {/* Header con Buscador */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={22} color={COLORS.primary} />
+      <View style={[styles.header, isDark && { backgroundColor: themeColors.background, borderBottomColor: themeColors.border }]}>
+        <TouchableOpacity
+          style={[styles.backButton, isDark && { backgroundColor: themeColors.surfaceLow }]}
+          onPress={() => router.back()}
+          accessibilityLabel="Volver"
+        >
+          <Ionicons name="arrow-back" size={22} color={themeColors.primary} />
         </TouchableOpacity>
 
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={18} color={COLORS.textSecondary} />
+        <View style={[styles.searchBar, isDark && { backgroundColor: themeColors.inputBg, borderColor: themeColors.border }]}>
+          <Ionicons name="search" size={18} color={themeColors.textSecondary} />
           <TextInput
-            style={styles.searchInput}
-            placeholder="Buscar por nombre o servicio..."
-            placeholderTextColor={COLORS.textSecondary}
+            style={[styles.searchInput, isDark && { color: themeColors.text }]}
+            placeholder="Buscar por nombre, servicio u oficio..."
+            placeholderTextColor={isDark ? '#71717A' : COLORS.textSecondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
+            returnKeyType="search"
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={18} color={COLORS.textSecondary} />
+            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Ionicons name="close-circle" size={18} color={themeColors.textSecondary} />
             </TouchableOpacity>
           )}
         </View>
       </View>
 
-      {/* Chips de Categorías */}
-      <View style={styles.categoriesContainer}>
+      {/* Chips Horizontales de Categorías */}
+      <View style={[styles.categoriesContainer, isDark && { backgroundColor: themeColors.background, borderBottomColor: themeColors.border }]}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.categoriesScroll}
         >
-          {CATEGORIES.map((cat) => {
-            const isActive = selectedCategory === cat;
+          {categories.map((cat) => {
+            const isActive = selectedCategory.toLowerCase() === cat.toLowerCase();
             return (
               <TouchableOpacity
                 key={cat}
-                style={[styles.chip, isActive && styles.activeChip]}
+                style={[
+                  styles.chip,
+                  isDark && { backgroundColor: themeColors.surfaceLow, borderColor: themeColors.border },
+                  isActive && (isDark ? { backgroundColor: themeColors.primary, borderColor: themeColors.primary } : styles.activeChip),
+                ]}
                 onPress={() => setSelectedCategory(cat)}
+                activeOpacity={0.7}
               >
-                <Text style={[styles.chipText, isActive && styles.activeChipText]}>
+                <Text
+                  style={[
+                    styles.chipText,
+                    isDark && { color: themeColors.textSecondary },
+                    isActive && (isDark ? { color: themeColors.onPrimary, fontWeight: '700' } : styles.activeChipText),
+                  ]}
+                >
                   {cat}
                 </Text>
               </TouchableOpacity>
@@ -253,58 +247,104 @@ export default function SearchScreen() {
         </ScrollView>
       </View>
 
-      {/* Lista de Resultados de Firestore */}
+      {/* Contenido / Lista de Resultados */}
       {loading ? (
         <View style={styles.centerLoading}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>Buscando profesionales...</Text>
+          <ActivityIndicator size="large" color={themeColors.primary} />
+          <Text style={[styles.loadingText, isDark && { color: themeColors.textSecondary }]}>Buscando profesionales...</Text>
         </View>
       ) : (
         <ScrollView
           contentContainerStyle={styles.resultsList}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.resultsCount}>
+          <Text style={[styles.resultsCount, isDark && { color: themeColors.textSecondary }]}>
             {filteredProfessionals.length}{' '}
-            {filteredProfessionals.length === 1 ? 'resultado encontrado' : 'resultados encontrados'}
+            {filteredProfessionals.length === 1 ? 'profesional disponible' : 'profesionales disponibles'}
           </Text>
 
           {filteredProfessionals.length === 0 ? (
             <View style={styles.emptyState}>
-              <Ionicons name="search-outline" size={48} color={COLORS.textSecondary} />
-              <Text style={styles.emptyText}>No se encontraron profesionales con esos criterios.</Text>
+              <View style={[styles.emptyIconContainer, isDark && { backgroundColor: themeColors.surfaceLow }]}>
+                <Ionicons name="search-outline" size={44} color={themeColors.textSecondary} />
+              </View>
+              <Text style={[styles.emptyTitle, isDark && { color: themeColors.text }]}>Sin resultados encontrados</Text>
+              <Text style={[styles.emptyText, isDark && { color: themeColors.textSecondary }]}>
+                No hallamos profesionales para tu criterio. Intenta buscando otra especialidad o categoría.
+              </Text>
+              <TouchableOpacity
+                style={[styles.resetFilterButton, isDark && { backgroundColor: themeColors.primary }]}
+                onPress={() => {
+                  setSelectedCategory('Todos');
+                  setSearchQuery('');
+                }}
+              >
+                <Text style={[styles.resetFilterText, isDark && { color: themeColors.onPrimary }]}>Ver todos los profesionales</Text>
+              </TouchableOpacity>
             </View>
           ) : (
             filteredProfessionals.map((pro) => {
               const w = pro as any;
-              const name = `${w.firstName || ''} ${w.lastName || ''}`.trim() || w.userNameSnapshot || 'Profesional';
-              const roleTitle = w.roleTitle || w.title || w.category || 'Especialista en servicios';
-              const rating = w.avgRating !== undefined ? Number(w.avgRating).toFixed(1) : 'Nuevo';
-              const price = w.hourlyRate ? `$${w.hourlyRate}/h` : 'A convenir';
-              const imageUrl = w.avatarUrl || w.photoURL || 'https://via.placeholder.com/150';
+              const name = `${w.firstName || ''} ${w.lastName || ''}`.trim() || w.userNameSnapshot || 'Profesional GoodJob';
+              const photo = getWorkerPhoto(w);
+              const rating = w.avgRating ? Number(w.avgRating).toFixed(1) : '5.0';
+              const experience = w.yearsExperience ? `${w.yearsExperience} años exp.` : 'Verificado';
+              const bio = w.bio || w.roleTitle || w.category || 'Especialista en servicios';
+              const isFav = favorites.includes(pro.id);
 
               return (
-                <View key={pro.id} style={styles.proCard}>
-                  <Image source={{ uri: imageUrl }} style={styles.proImage} />
-                  <View style={styles.proContent}>
-                    <Text style={styles.proName}>{name}</Text>
-                    <Text style={styles.proRole}>{roleTitle}</Text>
+                <View key={pro.id} style={[styles.proCard, isDark && { backgroundColor: themeColors.card, borderColor: themeColors.border }]}>
+                  <View style={styles.imageContainer}>
+                    <Image source={{ uri: photo }} style={styles.proImage} />
+                    <TouchableOpacity
+                      style={[styles.favoriteButton, isDark && { backgroundColor: 'rgba(24, 24, 27, 0.8)' }]}
+                      activeOpacity={0.8}
+                      onPress={() => toggleFavorite(pro)}
+                    >
+                      <Ionicons
+                        name={isFav ? 'heart' : 'heart-outline'}
+                        size={20}
+                        color={isFav ? COLORS.error : themeColors.primary}
+                      />
+                    </TouchableOpacity>
+                  </View>
 
-                    <View style={styles.row}>
-                      <Ionicons name="star" size={14} color={COLORS.primary} />
-                      <Text style={styles.ratingText}>{rating}</Text>
-                      <Text style={styles.dot}>•</Text>
-                      <Ionicons name="pricetag-outline" size={14} color={COLORS.textSecondary} />
-                      <Text style={styles.infoText}>{price}</Text>
+                  <View style={styles.proContent}>
+                    <Text style={[styles.proName, isDark && { color: themeColors.text }]}>{name}</Text>
+                    <Text style={[styles.proCategory, isDark && { color: themeColors.textSecondary }]} numberOfLines={2}>{bio}</Text>
+
+                    <View style={styles.proRatingRow}>
+                      <View style={[styles.ratingBadge, isDark && { backgroundColor: themeColors.surfaceLow }]}>
+                        <Ionicons name="star" size={14} color="#FBBF24" />
+                        <Text style={[styles.ratingText, isDark && { color: themeColors.text }]}>{rating}</Text>
+                      </View>
+                      <Text style={[styles.dotSeparator, isDark && { color: themeColors.textSecondary }]}>•</Text>
+                      <View style={[styles.distanceBadge, isDark && { backgroundColor: themeColors.surfaceLow }]}>
+                        <Ionicons name="shield-checkmark-outline" size={14} color={themeColors.textSecondary} />
+                        <Text style={[styles.distanceText, isDark && { color: themeColors.textSecondary }]}>{experience}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.proDetailsRow}>
+                      <View style={[styles.detailBox, isDark && { backgroundColor: themeColors.surfaceLow }]}>
+                        <Text style={[styles.detailLabel, isDark && { color: themeColors.textSecondary }]}>TARIFA / HORA</Text>
+                        <Text style={[styles.detailValue, isDark && { color: themeColors.text }]}>
+                          {w.hourlyRate ? `$${w.hourlyRate}/h` : 'A convenir'}
+                        </Text>
+                      </View>
+                      <View style={[styles.detailBox, isDark && { backgroundColor: themeColors.surfaceLow }]}>
+                        <Text style={[styles.detailLabel, isDark && { color: themeColors.textSecondary }]}>RESEÑAS</Text>
+                        <Text style={[styles.detailValue, isDark && { color: themeColors.text }]}>{w.totalReviews || 0} recibidas</Text>
+                      </View>
                     </View>
 
                     <TouchableOpacity
-                      style={styles.profileButton}
-                      activeOpacity={0.8}
-                      onPress={() => router.push(`/worker/${pro.id}`)}
+                      style={[styles.profileButton, isDark && { backgroundColor: themeColors.surfaceLow, borderColor: themeColors.border }]}
+                      activeOpacity={0.85}
+                      onPress={() => router.push(`/(workers)/${pro.id}`)}
                     >
-                      <Text style={styles.profileButtonText}>Ver Perfil</Text>
-                      <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
+                      <Text style={[styles.profileButtonText, isDark && { color: themeColors.text }]}>Ver Perfil y Reservar</Text>
+                      <Ionicons name="chevron-forward" size={16} color={themeColors.primary} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -314,92 +354,17 @@ export default function SearchScreen() {
         </ScrollView>
       )}
 
-      {/* Modal Personalizado Integrado */}
+      {/* Modal Reutilizable de Mensajes */}
       <CustomModal
-        visible={modalConfig.visible}
+        visible={modalVisible}
         type={modalConfig.type}
-        title={modalConfig.title}
         message={modalConfig.message}
-        primaryButtonText={modalConfig.primaryButtonText}
-        secondaryButtonText={modalConfig.secondaryButtonText}
-        onPrimaryPress={modalConfig.onPrimaryPress}
-        onSecondaryPress={modalConfig.onSecondaryPress}
+        onClose={handleModalClose}
       />
     </SafeAreaView>
   );
 }
 
-// Estilos del Modal
-const modalStyles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  container: {
-    width: '100%',
-    backgroundColor: COLORS.surface,
-    borderRadius: 20,
-    padding: 24,
-    alignItems: 'center',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-  iconContainer: {
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  message: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 20,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    width: '100%',
-  },
-  button: {
-    flex: 1,
-    height: 44,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  primaryButton: {
-    backgroundColor: COLORS.primary,
-  },
-  secondaryButton: {
-    backgroundColor: COLORS.surfaceLow,
-    borderWidth: 1,
-    borderColor: COLORS.surfaceVariant,
-  },
-  primaryButtonText: {
-    color: COLORS.onPrimary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  secondaryButtonText: {
-    color: COLORS.textPrimary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-});
-
-// Estilos Principales
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -414,9 +379,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: COLORS.surfaceLow,
     justifyContent: 'center',
     alignItems: 'center',
@@ -426,8 +391,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.surfaceLow,
-    borderRadius: 12,
-    paddingHorizontal: 12,
+    borderRadius: 14,
+    paddingHorizontal: 14,
     height: 44,
     gap: 8,
   },
@@ -445,7 +410,7 @@ const styles = StyleSheet.create({
   },
   chip: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderRadius: 20,
     backgroundColor: COLORS.surfaceLow,
   },
@@ -466,9 +431,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 12,
     fontSize: 14,
     color: COLORS.textSecondary,
+    fontWeight: '500',
   },
   resultsList: {
     paddingHorizontal: 20,
@@ -479,74 +445,163 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginBottom: 16,
     marginTop: 8,
+    fontWeight: '500',
   },
   emptyState: {
     alignItems: 'center',
-    marginTop: 40,
-    gap: 12,
+    marginTop: 50,
+    paddingHorizontal: 24,
+  },
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.surfaceLow,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
     color: COLORS.textSecondary,
     textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
   },
+  resetFilterButton: {
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: COLORS.surfaceLow,
+  },
+  resetFilterText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+  // Tarjeta de Profesional Vertical - Consistente con Home Screen
   proCard: {
-    flexDirection: 'row',
     backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 14,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: COLORS.surfaceVariant,
-    gap: 12,
+    overflow: 'hidden',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 16,
+    elevation: 3,
+  },
+  imageContainer: {
+    position: 'relative',
+    width: '100%',
+    height: 180,
   },
   proImage: {
-    width: 90,
-    height: 100,
-    borderRadius: 12,
+    width: '100%',
+    height: '100%',
     backgroundColor: COLORS.surfaceVariant,
   },
-  proContent: {
-    flex: 1,
+  favoriteButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: COLORS.surface,
     justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  proContent: {
+    padding: 18,
   },
   proName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     color: COLORS.textPrimary,
   },
-  proRole: {
-    fontSize: 13,
+  proCategory: {
+    fontSize: 14,
     color: COLORS.textSecondary,
-    marginTop: 2,
+    marginTop: 4,
+    lineHeight: 19,
   },
-  row: {
+  proRatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  ratingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: 8,
   },
   ratingText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
     color: COLORS.textPrimary,
   },
-  dot: {
+  dotSeparator: {
+    marginHorizontal: 8,
     color: COLORS.surfaceVariant,
-    marginHorizontal: 2,
   },
-  infoText: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-  profileButton: {
-    marginTop: 10,
+  distanceBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
-  profileButtonText: {
+  distanceText: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+  },
+  proDetailsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+  },
+  detailBox: {
+    flex: 1,
+    backgroundColor: COLORS.surfaceLow,
+    borderRadius: 12,
+    padding: 10,
+  },
+  detailLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+    letterSpacing: 0.5,
+  },
+  detailValue: {
     fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginTop: 2,
+  },
+  profileButton: {
+    marginTop: 14,
+    height: 46,
+    backgroundColor: COLORS.surfaceLow,
+    borderRadius: 12,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+  },
+  profileButtonText: {
+    fontSize: 14,
     fontWeight: '600',
     color: COLORS.primary,
   },

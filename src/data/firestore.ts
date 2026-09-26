@@ -17,10 +17,12 @@ import {
   limit,
   Timestamp,
   addDoc,
+  onSnapshot,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import {
   User,
+  Address,
   Worker,
   Category,
   Booking,
@@ -302,12 +304,11 @@ export const bookingService = {
     try {
       const q = query(
         collection(db, 'bookings'),
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc')
+        where('userId', '==', userId)
       );
 
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map((docSnap) => {
+      const list = querySnapshot.docs.map((docSnap) => {
         const data = docSnap.data();
         return {
           ...data,
@@ -316,6 +317,13 @@ export const bookingService = {
           createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
           updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
         } as Booking;
+      });
+
+      // Ordenar en memoria descendentemente sin requerir índice compuesto
+      return list.sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeB - timeA;
       });
     } catch (error) {
       console.error('Error getting user bookings:', error);
@@ -328,12 +336,11 @@ export const bookingService = {
     try {
       const q = query(
         collection(db, 'bookings'),
-        where('workerId', '==', workerId),
-        orderBy('createdAt', 'desc')
+        where('workerId', '==', workerId)
       );
 
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map((docSnap) => {
+      const list = querySnapshot.docs.map((docSnap) => {
         const data = docSnap.data();
         return {
           ...data,
@@ -342,6 +349,12 @@ export const bookingService = {
           createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
           updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
         } as Booking;
+      });
+
+      return list.sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeB - timeA;
       });
     } catch (error) {
       console.error('Error getting worker bookings:', error);
@@ -389,17 +402,64 @@ export const bookingService = {
 // ============================================================================
 
 export const reviewService = {
-  // Crear reseña
-  async create(data: Partial<Review>): Promise<string> {
+  // Crear reseña y actualizar la calificación promedio del trabajador
+  async submitReview(data: {
+    workerId: string;
+    userId: string;
+    bookingId?: string;
+    rating: number;
+    comment: string;
+    userName?: string;
+    userPhoto?: string;
+  }): Promise<string> {
     try {
-      const docRef = await addDoc(collection(db, 'reviews'), {
-        ...data,
+      // 1. Guardar la reseña en la colección 'reviews'
+      const reviewRef = await addDoc(collection(db, 'reviews'), {
+        workerId: data.workerId,
+        userId: data.userId,
+        bookingId: data.bookingId || '',
+        userName: data.userName || 'Usuario GoodJob',
+        userPhoto: data.userPhoto || '',
+        rating: data.rating,
+        comment: data.comment.trim(),
+        isVisible: true,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       });
-      return docRef.id;
+
+      // 2. Si venía asociada a una reserva, marcar la reserva como 'completed' y 'reviewed'
+      if (data.bookingId) {
+        try {
+          await updateDoc(doc(db, 'bookings', data.bookingId), {
+            status: 'completed',
+            isReviewed: true,
+            reviewId: reviewRef.id,
+            updatedAt: Timestamp.now(),
+          });
+        } catch (bErr) {
+          console.warn('Could not update booking reviewed status:', bErr);
+        }
+      }
+
+      // 3. Recalcular el promedio de calificación y total de reseñas del trabajador
+      try {
+        const workerReviews = await reviewService.getByWorkerId(data.workerId);
+        const total = workerReviews.length;
+        const sum = workerReviews.reduce((acc, curr) => acc + (curr.rating || 5), 0);
+        const avg = total > 0 ? parseFloat((sum / total).toFixed(1)) : data.rating;
+
+        await updateDoc(doc(db, 'workers', data.workerId), {
+          avgRating: avg,
+          totalReviews: total,
+          updatedAt: Timestamp.now(),
+        });
+      } catch (wErr) {
+        console.warn('Could not recalculate worker rating:', wErr);
+      }
+
+      return reviewRef.id;
     } catch (error) {
-      console.error('Error creating review:', error);
+      console.error('Error submitting review:', error);
       throw error;
     }
   },
@@ -466,12 +526,11 @@ export const chatService = {
     try {
       const q = query(
         collection(db, 'chats'),
-        where('userId', '==', userId),
-        orderBy('lastMessageAt', 'desc')
+        where('userId', '==', userId)
       );
 
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map((docSnap) => {
+      const list = querySnapshot.docs.map((docSnap) => {
         const data = docSnap.data();
         return {
           ...data,
@@ -480,6 +539,12 @@ export const chatService = {
           createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
           updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
         } as Chat;
+      });
+
+      return list.sort((a, b) => {
+        const timeA = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
+        const timeB = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+        return timeB - timeA;
       });
     } catch (error) {
       console.error('Error getting chats:', error);
@@ -510,6 +575,74 @@ export const chatService = {
         .reverse();
     } catch (error) {
       console.error('Error getting messages:', error);
+      throw error;
+    }
+  },
+
+  // Suscribirse a mensajes en tiempo real con onSnapshot
+  subscribeToMessages(
+    chatId: string,
+    callback: (messages: ChatMessage[]) => void,
+    limit_count: number = 50
+  ) {
+    const q = query(
+      collection(db, 'chats', chatId, 'chatMessages'),
+      orderBy('createdAt', 'desc'),
+      limit(limit_count)
+    );
+
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const messages = snapshot.docs
+          .map((docSnap) => {
+            const data = docSnap.data();
+            return {
+              ...data,
+              id: docSnap.id,
+              createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
+              updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
+            } as ChatMessage;
+          })
+          .reverse();
+        callback(messages);
+      },
+      (error) => {
+        console.error('Error listening to chat messages:', error);
+      }
+    );
+  },
+
+  // Obtener o crear un chat entre usuario y trabajador
+  async getOrCreateByWorker(userId: string, worker: Worker): Promise<string> {
+    try {
+      const q = query(
+        collection(db, 'chats'),
+        where('userId', '==', userId),
+        where('workerId', '==', worker.id),
+        limit(1)
+      );
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        return snapshot.docs[0].id;
+      }
+
+      // Si no existe, lo creamos
+      const w = worker as any;
+      const workerName = `${w.firstName || ''} ${w.lastName || ''}`.trim() || worker.userNameSnapshot || 'Profesional';
+      const docRef = await addDoc(collection(db, 'chats'), {
+        userId,
+        workerId: worker.id,
+        workerNameSnapshot: workerName,
+        workerPhotoSnapshot: worker.userPhotoSnapshot || '',
+        lastMessage: '',
+        unreadCount: 0,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      });
+      return docRef.id;
+    } catch (error) {
+      console.error('Error getting or creating chat:', error);
       throw error;
     }
   },
@@ -589,12 +722,51 @@ export const favoriteService = {
     }
   },
 
-  // Eliminar de favoritos
+  // Eliminar de favoritos por ID de documento
   async remove(favoriteId: string) {
     try {
       await deleteDoc(doc(db, 'favorites', favoriteId));
     } catch (error) {
       console.error('Error removing favorite:', error);
+      throw error;
+    }
+  },
+
+  // Alternar favorito (guardar o remover según exista)
+  async toggle(userId: string, worker: Worker): Promise<boolean> {
+    try {
+      const q = query(
+        collection(db, 'favorites'),
+        where('userId', '==', userId),
+        where('workerId', '==', worker.id),
+        limit(1)
+      );
+
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        // Ya existía: lo eliminamos
+        const favDoc = querySnapshot.docs[0];
+        await deleteDoc(doc(db, 'favorites', favDoc.id));
+        return false; // ya no es favorito
+      } else {
+        // No existía: lo agregamos
+        const w = worker as any;
+        const name = `${w.firstName || ''} ${w.lastName || ''}`.trim() || worker.userNameSnapshot || 'Trabajador';
+        await addDoc(collection(db, 'favorites'), {
+          userId,
+          workerId: worker.id,
+          workerNameSnapshot: name,
+          workerPhotoSnapshot: worker.userPhotoSnapshot || '',
+          workerRatingSnapshot: worker.avgRating || 5.0,
+          createdBy: userId,
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        });
+        return true; // ahora es favorito
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
       throw error;
     }
   },
@@ -626,13 +798,11 @@ export const notificationService = {
     try {
       const q = query(
         collection(db, 'notifications'),
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc'),
-        limit(50)
+        where('userId', '==', userId)
       );
 
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map((docSnap) => {
+      const list = querySnapshot.docs.map((docSnap) => {
         const data = docSnap.data();
         return {
           ...data,
@@ -641,10 +811,35 @@ export const notificationService = {
           updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
         } as Notification;
       });
+
+      return list.sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeB - timeA;
+      });
     } catch (error) {
       console.error('Error getting notifications:', error);
       throw error;
     }
+  },
+
+  // Escuchar notificaciones no leídas en tiempo real
+  subscribeToUnread(userId: string, callback: (count: number) => void) {
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', '==', userId),
+      where('read', '==', false)
+    );
+
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        callback(snapshot.docs.length);
+      },
+      (error) => {
+        console.warn('Error listening to unread notifications:', error);
+      }
+    );
   },
 
   // Marcar notificación como leída
@@ -661,8 +856,160 @@ export const notificationService = {
   },
 };
 
+// ============================================================================
+// DIRECCIONES
+// ============================================================================
+
+export const addressService = {
+  // Obtener dirección predeterminada o la primera del usuario
+  async getDefaultByUserId(userId: string): Promise<Address | null> {
+    try {
+      const q = query(
+        collection(db, 'addresses'),
+        where('userId', '==', userId),
+        limit(1)
+      );
+
+      const querySnapshot = await getDocs(q);
+      if (querySnapshot.empty) return null;
+
+      const docSnap = querySnapshot.docs[0];
+      const data = docSnap.data();
+      return {
+        ...data,
+        id: docSnap.id,
+        createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
+        updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
+      } as Address;
+    } catch (error) {
+      console.error('Error getting address:', error);
+      throw error;
+    }
+  },
+
+  // Guardar o actualizar la dirección del usuario
+  async saveOrUpdate(userId: string, addressData: Partial<Address>): Promise<string> {
+    try {
+      const existing = await this.getDefaultByUserId(userId);
+
+      if (existing) {
+        await updateDoc(doc(db, 'addresses', existing.id), {
+          ...addressData,
+          updatedAt: Timestamp.now(),
+        });
+        return existing.id;
+      } else {
+        const docRef = await addDoc(collection(db, 'addresses'), {
+          userId,
+          alias: addressData.alias || 'home',
+          street: addressData.street || '',
+          number: addressData.number || '',
+          neighborhood: addressData.neighborhood || '',
+          city: addressData.city || '',
+          state: addressData.state || '',
+          zipCode: addressData.zipCode || '',
+          country: addressData.country || 'México',
+          lat: addressData.lat || 0,
+          lng: addressData.lng || 0,
+          isDefault: true,
+          createdBy: userId,
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        });
+        return docRef.id;
+      }
+    } catch (error) {
+      console.error('Error saving address:', error);
+      throw error;
+    }
+  },
+};
+
+// ============================================================================
+// MÉTODOS DE PAGO DEL USUARIO
+// ============================================================================
+
+export interface UserPaymentMethod {
+  id: string;
+  userId: string;
+  type: 'card' | 'cash' | 'transfer';
+  title: string; // ej: 'Tarjeta Débito BBVA', 'Efectivo al finalizar'
+  cardBrand?: 'VISA' | 'MasterCard' | 'AMEX' | 'Otro';
+  last4?: string; // ej: '4242'
+  expiryDate?: string; // ej: '12/28'
+  isDefault: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export const paymentMethodService = {
+  // Obtener métodos de pago del usuario
+  async getByUserId(userId: string): Promise<UserPaymentMethod[]> {
+    try {
+      const q = query(
+        collection(db, 'paymentMethods'),
+        where('userId', '==', userId)
+      );
+
+      const querySnapshot = await getDocs(q);
+      const list = querySnapshot.docs.map((docSnap) => {
+        const data = docSnap.data();
+        return {
+          ...data,
+          id: docSnap.id,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
+        } as UserPaymentMethod;
+      });
+
+      return list.sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeB - timeA;
+      });
+    } catch (error) {
+      console.error('Error getting payment methods:', error);
+      throw error;
+    }
+  },
+
+  // Agregar nuevo método de pago
+  async add(userId: string, data: Partial<UserPaymentMethod>): Promise<string> {
+    try {
+      const docRef = await addDoc(collection(db, 'paymentMethods'), {
+        ...data,
+        userId,
+        type: data.type || 'card',
+        title: data.title || 'Tarjeta Personal',
+        cardBrand: data.cardBrand || 'VISA',
+        last4: data.last4 || '1234',
+        expiryDate: data.expiryDate || '12/28',
+        isDefault: data.isDefault ?? false,
+        createdBy: userId,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      });
+      return docRef.id;
+    } catch (error) {
+      console.error('Error adding payment method:', error);
+      throw error;
+    }
+  },
+
+  // Eliminar método de pago
+  async remove(paymentMethodId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'paymentMethods', paymentMethodId));
+    } catch (error) {
+      console.error('Error removing payment method:', error);
+      throw error;
+    }
+  },
+};
+
 export default {
   userService,
+  addressService,
   workerService,
   categoryService,
   bookingService,
@@ -670,4 +1017,5 @@ export default {
   chatService,
   favoriteService,
   notificationService,
+  paymentMethodService,
 };

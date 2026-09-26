@@ -10,33 +10,27 @@ import {
   StatusBar,
   Platform,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 // Importación de servicios de Firestore y tipos
-import { workerService, reviewService } from '../../src/data/firestore';
+import { workerService, reviewService, favoriteService } from '../../src/data/firestore';
 import { Worker, Review } from '../../src/types';
-
-// --- Paleta de colores Monochrome Premium ---
-const COLORS = {
-  background: '#F9F9FB',
-  surface: '#FFFFFF',
-  surfaceLow: '#F3F3F5',
-  surfaceVariant: '#E2E2E4',
-  textPrimary: '#1A1C1D',
-  textSecondary: '#4C4546',
-  primary: '#000000',
-  onPrimary: '#FFFFFF',
-  error: '#BA1A1A',
-};
+import { CustomModal, ModalType } from '../../src/components/CustomModal';
+import { auth } from '../../src/config/firebase';
+import { getWorkerPhoto } from '../../src/utils/avatarUtils';
+import { useThemeStore } from '../../src/utils/themeStore';
 
 const DEFAULT_AVATAR =
   'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=400';
 
 export default function WorkerDetailScreen() {
+  const isDark = useThemeStore((state) => state.isDark);
+  const themeColors = useThemeStore((state) => state.colors);
+  const styles = React.useMemo(() => createStyles(themeColors, isDark), [themeColors, isDark]);
+
   const { id } = useLocalSearchParams<{ id: string }>();
   const [isFavorite, setIsFavorite] = useState(false);
 
@@ -44,6 +38,29 @@ export default function WorkerDetailScreen() {
   const [worker, setWorker] = useState<Worker | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+
+  // Modal
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState<{
+    type: ModalType;
+    message: string;
+    onCloseAction?: () => void;
+  }>({
+    type: 'danger',
+    message: '',
+  });
+
+  const showModal = (type: ModalType, message: string, onCloseAction?: () => void) => {
+    setModalConfig({ type, message, onCloseAction });
+    setModalVisible(true);
+  };
+
+  const handleModalClose = () => {
+    setModalVisible(false);
+    if (modalConfig.onCloseAction) {
+      modalConfig.onCloseAction();
+    }
+  };
 
   useEffect(() => {
     if (id) {
@@ -61,11 +78,36 @@ export default function WorkerDetailScreen() {
       // Consulta a Firestore: Obtener colección de reseñas relacionadas
       const reviewData = await reviewService.getByWorkerId(workerId);
       setReviews(reviewData);
+
+      // Verificar si es favorito del usuario actual
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        const favs = await favoriteService.getByUserId(currentUser.uid);
+        setIsFavorite(favs.some((f) => f.workerId === workerId));
+      }
     } catch (error) {
       console.error('Error al cargar datos de Firestore:', error);
-      Alert.alert('Error', 'No se pudieron obtener los detalles del profesional.');
+      showModal('danger', 'No se pudieron obtener los detalles del profesional.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleToggleFavorite = async () => {
+    if (!worker) return;
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      showModal('info', 'Debes iniciar sesión para guardar favoritos.');
+      return;
+    }
+
+    const prevFav = isFavorite;
+    setIsFavorite(!prevFav);
+    try {
+      await favoriteService.toggle(currentUser.uid, worker);
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      setIsFavorite(prevFav);
     }
   };
 
@@ -75,14 +117,16 @@ export default function WorkerDetailScreen() {
   const handleRequestService = () => {
     if (!worker) return;
     
-    // Obtener nombre formateado desde los campos de Firebase
+    // Obtener nombre y categoría/profesión formateados desde los campos de Firebase
     const name = `${w?.firstName || ''} ${w?.lastName || ''}`.trim() || w?.userNameSnapshot || 'Profesional';
+    const category = w?.title || w?.category || (w?.bio ? w.bio.split('.')[0] : 'Especialista en servicios');
 
     router.push({
       pathname: '/booking' as any,
       params: { 
         workerId: worker.id, 
-        workerName: name
+        workerName: name,
+        workerCategory: category,
       },
     });
   };
@@ -91,7 +135,7 @@ export default function WorkerDetailScreen() {
   if (loading) {
     return (
       <SafeAreaView style={[styles.safeArea, styles.centerContent]}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <ActivityIndicator size="large" color={themeColors.primary} />
         <Text style={styles.loadingText}>Cargando perfil desde Firestore...</Text>
       </SafeAreaView>
     );
@@ -101,7 +145,7 @@ export default function WorkerDetailScreen() {
   if (!worker) {
     return (
       <SafeAreaView style={[styles.safeArea, styles.centerContent]}>
-        <Ionicons name="alert-circle-outline" size={50} color={COLORS.textSecondary} />
+        <Ionicons name="alert-circle-outline" size={50} color={themeColors.textSecondary} />
         <Text style={styles.notFoundText}>No se encontró información de este profesional.</Text>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Text style={styles.backButtonText}>Volver</Text>
@@ -129,19 +173,19 @@ export default function WorkerDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+      <StatusBar barStyle={themeColors.statusBar} backgroundColor={themeColors.background} />
 
       {/* --- Header --- */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.iconButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={22} color={COLORS.primary} />
+          <Ionicons name="arrow-back" size={22} color={themeColors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Perfil Profesional</Text>
-        <TouchableOpacity style={styles.iconButton} onPress={() => setIsFavorite(!isFavorite)}>
+        <TouchableOpacity style={styles.iconButton} onPress={handleToggleFavorite}>
           <Ionicons
             name={isFavorite ? 'heart' : 'heart-outline'}
             size={22}
-            color={isFavorite ? COLORS.error : COLORS.primary}
+            color={isFavorite ? themeColors.error : themeColors.textPrimary}
           />
         </TouchableOpacity>
       </View>
@@ -150,7 +194,7 @@ export default function WorkerDetailScreen() {
         {/* --- Card Principal de Usuario --- */}
         <View style={styles.profileHeaderCard}>
           <Image 
-            source={{ uri: w.userPhotoSnapshot || w.photoUrl || w.avatarUrl || w.photoURL || DEFAULT_AVATAR }} 
+            source={{ uri: getWorkerPhoto(w) }} 
             style={styles.avatar} 
           />
           <Text style={styles.workerName}>{fullName}</Text>
@@ -158,12 +202,12 @@ export default function WorkerDetailScreen() {
 
           <View style={styles.badgeRow}>
             <View style={styles.badge}>
-              <Ionicons name="star" size={14} color={COLORS.primary} />
+              <Ionicons name="star" size={14} color={themeColors.star} />
               <Text style={styles.badgeText}>{ratingValue} ({totalReviewsCount})</Text>
             </View>
             <Text style={styles.dot}>•</Text>
             <View style={styles.badge}>
-              <Ionicons name="location-outline" size={14} color={COLORS.textSecondary} />
+              <Ionicons name="location-outline" size={14} color={themeColors.textSecondary} />
               <Text style={styles.badgeText}>{w.available !== false ? 'Disponible' : 'Ocupado'}</Text>
             </View>
           </View>
@@ -236,7 +280,7 @@ export default function WorkerDetailScreen() {
                       key={i}
                       name={i < Math.floor(rev.rating || 5) ? 'star' : 'star-outline'}
                       size={14}
-                      color={COLORS.primary}
+                      color={themeColors.star}
                     />
                   ))}
                 </View>
@@ -258,15 +302,23 @@ export default function WorkerDetailScreen() {
         </View>
         <TouchableOpacity style={styles.ctaButton} activeOpacity={0.8} onPress={handleRequestService}>
           <Text style={styles.ctaButtonText}>Solicitar Servicio</Text>
-          <Ionicons name="arrow-forward" size={18} color={COLORS.onPrimary} />
+          <Ionicons name="arrow-forward" size={18} color={themeColors.onPrimary} />
         </TouchableOpacity>
       </View>
+
+      {/* Modal Reutilizable */}
+      <CustomModal
+        visible={modalVisible}
+        type={modalConfig.type}
+        message={modalConfig.message}
+        onClose={handleModalClose}
+      />
     </SafeAreaView>
   );
 }
 
-// --- Estilos de UI ---
-const styles = StyleSheet.create({
+// --- Estilos de UI adaptados al Tema ---
+const createStyles = (COLORS: any, isDark: boolean) => StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: COLORS.background,
