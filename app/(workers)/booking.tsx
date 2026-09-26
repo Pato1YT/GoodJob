@@ -1,5 +1,5 @@
-// Pantalla de Reserva de Servicio (Conectada con Firestore y CustomModal)
-import React, { useState } from 'react';
+// Pantalla de Reserva de Servicio - Conectada a Firestore con fechas dinámicas
+import React, { useState, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -10,14 +10,17 @@ import {
   StatusBar,
   Platform,
   ActivityIndicator,
-  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-// Servicio de Firestore
-import { bookingService } from '../../src/data/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
+import { bookingService, chatService, workerService, userService } from '../../src/data/firestore';
+import { CustomModal, ModalType } from '../../src/components/CustomModal';
+import { auth, db } from '../../src/config/firebase';
+import { getWorkerPhoto } from '../../src/utils/avatarUtils';
+import { appNotificationService } from '../../src/services/notificationManager';
 
 const COLORS = {
   background: '#F9F9FB',
@@ -32,170 +35,155 @@ const COLORS = {
   success: '#2E7D32',
 };
 
-// Fechas simulación (próximos 5 días)
-const DATES = [
-  { day: 'Lun', number: '24', full: '2026-08-24' },
-  { day: 'Mar', number: '25', full: '2026-08-25' },
-  { day: 'Mié', number: '26', full: '2026-08-26' },
-  { day: 'Jue', number: '27', full: '2026-08-27' },
-  { day: 'Vie', number: '28', full: '2026-08-28' },
-];
-
 const TIME_SLOTS = ['09:00 AM', '11:00 AM', '02:00 PM', '04:00 PM', '06:00 PM'];
 
-// Componente CustomModal
-interface CustomModalProps {
-  visible: boolean;
-  type?: 'success' | 'error' | 'info';
-  title: string;
-  message: string;
-  primaryButtonText?: string;
-  secondaryButtonText?: string;
-  onPrimaryPress: () => void;
-  onSecondaryPress?: () => void;
+// Generador de los próximos 7 días a partir de hoy
+function generateUpcomingDays() {
+  const days: { day: string; number: string; full: string; label: string }[] = [];
+  const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+  const now = new Date();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(now);
+    d.setDate(now.getDate() + i);
+
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const full = `${year}-${month}-${day}`;
+
+    days.push({
+      day: i === 0 ? 'Hoy' : dayNames[d.getDay()],
+      number: String(d.getDate()),
+      full,
+      label: `${dayNames[d.getDay()]} ${d.getDate()} ${monthNames[d.getMonth()]}`,
+    });
+  }
+  return days;
 }
 
-const CustomModal: React.FC<CustomModalProps> = ({
-  visible,
-  type = 'info',
-  title,
-  message,
-  primaryButtonText = 'Aceptar',
-  secondaryButtonText,
-  onPrimaryPress,
-  onSecondaryPress,
-}) => {
-  if (!visible) return null;
-
-  const getIcon = () => {
-    switch (type) {
-      case 'success':
-        return <Ionicons name="checkmark-circle" size={48} color={COLORS.success} />;
-      case 'error':
-        return <Ionicons name="alert-circle" size={48} color={COLORS.error} />;
-      default:
-        return <Ionicons name="information-circle" size={48} color={COLORS.primary} />;
-    }
-  };
-
-  return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={onPrimaryPress}>
-      <View style={modalStyles.overlay}>
-        <View style={modalStyles.container}>
-          <View style={modalStyles.iconContainer}>{getIcon()}</View>
-          <Text style={modalStyles.title}>{title}</Text>
-          <Text style={modalStyles.message}>{message}</Text>
-
-          <View style={modalStyles.buttonContainer}>
-            {secondaryButtonText && onSecondaryPress && (
-              <TouchableOpacity
-                style={[modalStyles.button, modalStyles.secondaryButton]}
-                onPress={onSecondaryPress}
-              >
-                <Text style={modalStyles.secondaryButtonText}>{secondaryButtonText}</Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity
-              style={[
-                modalStyles.button,
-                modalStyles.primaryButton,
-                type === 'error' && { backgroundColor: COLORS.error },
-              ]}
-              onPress={onPrimaryPress}
-            >
-              <Text style={modalStyles.primaryButtonText}>{primaryButtonText}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-};
-
 export default function BookingScreen() {
-  const { workerId, workerName } = useLocalSearchParams<{ workerId?: string; workerName?: string }>();
+  const { workerId, workerName, workerCategory } = useLocalSearchParams<{
+    workerId?: string;
+    workerName?: string;
+    workerCategory?: string;
+  }>();
 
-  const [selectedDate, setSelectedDate] = useState(DATES[0].full);
+  const availableDates = useMemo(() => generateUpcomingDays(), []);
+  const [selectedDate, setSelectedDate] = useState(availableDates[0].full);
   const [selectedTime, setSelectedTime] = useState(TIME_SLOTS[0]);
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
 
   // Estado del CustomModal
+  const [modalVisible, setModalVisible] = useState(false);
   const [modalConfig, setModalConfig] = useState<{
-    visible: boolean;
-    type: 'success' | 'error' | 'info';
-    title: string;
+    type: ModalType;
     message: string;
-    primaryButtonText?: string;
-    secondaryButtonText?: string;
-    onPrimaryPress: () => void;
-    onSecondaryPress?: () => void;
+    onCloseAction?: () => void;
   }>({
-    visible: false,
-    type: 'info',
-    title: '',
+    type: 'danger',
     message: '',
-    onPrimaryPress: () => {},
   });
 
-  const hideModal = () => {
-    setModalConfig((prev) => ({ ...prev, visible: false }));
+  const showModal = (type: ModalType, message: string, onCloseAction?: () => void) => {
+    setModalConfig({ type, message, onCloseAction });
+    setModalVisible(true);
+  };
+
+  const handleModalClose = () => {
+    setModalVisible(false);
+    if (modalConfig.onCloseAction) {
+      modalConfig.onCloseAction();
+    }
   };
 
   const handleConfirmBooking = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      showModal('info', 'Debes iniciar sesión para agendar un servicio.');
+      return;
+    }
+
+    if (!workerId) {
+      showModal('danger', 'No se ha especificado el profesional.');
+      return;
+    }
+
     try {
       setLoading(true);
 
-      const bookingPayload = {
-        workerId: workerId || '1',
-        workerName: workerName || 'Carlos Rodríguez',
+      // Obtener datos del cliente y del trabajador
+      const [workerData, clientData] = await Promise.all([
+        workerService.getById(workerId),
+        userService.getById(currentUser.uid),
+      ]);
+
+      const w = workerData as any;
+      const c = clientData as any;
+      const resolvedWorkerName = `${w?.firstName || ''} ${w?.lastName || ''}`.trim() || workerData?.userNameSnapshot || workerName || 'Profesional';
+      const resolvedWorkerCategory = w?.title || w?.category || (w?.bio ? w.bio.split('.')[0] : '') || workerCategory || 'Especialista en servicios';
+      const resolvedWorkerPhoto = getWorkerPhoto({ id: workerId, ...w, ...workerData });
+
+      const resolvedClientName = `${c?.firstName || ''} ${c?.lastName || ''}`.trim() || currentUser.displayName || 'Cliente GoodJob';
+      const resolvedClientPhone = c?.phone || '';
+      const resolvedClientPhoto = c?.photoUrl || currentUser.photoURL || '';
+
+      // Guardar reserva en Firestore con datos completos de ambas partes
+      await bookingService.create({
+        userId: currentUser.uid,
+        workerId,
+        workerNameSnapshot: resolvedWorkerName,
+        workerCategorySnapshot: resolvedWorkerCategory,
+        workerPhotoSnapshot: resolvedWorkerPhoto,
+        clientNameSnapshot: resolvedClientName,
+        clientPhoneSnapshot: resolvedClientPhone,
+        clientPhotoSnapshot: resolvedClientPhoto,
         date: selectedDate,
-        time: selectedTime,
-        description: description.trim(),
+        timeSlot: selectedTime,
+        notes: description.trim(),
         status: 'pending',
-        createdAt: new Date().toISOString(),
-      };
+      } as any);
 
-      const service = bookingService as any;
-      const createFn = service.create || service.addBooking || service.createBooking;
-
-      if (typeof createFn === 'function') {
-        await createFn(bookingPayload);
+      // Obtener o crear chat con este profesional para iniciar comunicación de inmediato
+      let chatId = workerId;
+      try {
+        if (workerData) {
+          chatId = await chatService.getOrCreateByWorker(currentUser.uid, workerData);
+          // Actualizar snapshot del cliente en el chat para que el trabajador vea quién le escribe
+          if (chatId) {
+            await updateDoc(doc(db, 'chats', chatId), {
+              clientNameSnapshot: resolvedClientName,
+              clientPhotoSnapshot: resolvedClientPhoto,
+              clientPhoneSnapshot: resolvedClientPhone,
+            }).catch(() => {});
+          }
+        }
+      } catch (chatErr) {
+        console.warn('Could not auto-create chat channel:', chatErr);
       }
 
-      // Éxito: abrir CustomModal con opciones de navegación
-      setModalConfig({
-        visible: true,
-        type: 'success',
-        title: '¡Reserva Solicitada!',
-        message: `Has agendado con ${workerName || 'el profesional'} para el ${selectedDate} a las ${selectedTime}.`,
-        primaryButtonText: 'Ir al Chat',
-        secondaryButtonText: 'Volver al Inicio',
-        onPrimaryPress: () => {
-          hideModal();
-          router.push(`/chat/${workerId || '1'}`);
-        },
-        onSecondaryPress: () => {
-          hideModal();
-          router.replace('/');
-        },
+      // Notificar al trabajador de la nueva reserva entrante
+      await appNotificationService.notifyUser({
+        userId: workerId,
+        title: '💼 ¡Nueva Solicitud de Reserva!',
+        body: `${resolvedClientName} ha solicitado tus servicios para el ${selectedDate} a las ${selectedTime}.`,
+        type: 'booking',
+        relatedId: workerId,
+        relatedCollection: 'bookings',
       });
+
+      showModal(
+        'success',
+        `¡Reserva solicitada con éxito!\nHas agendado con ${workerName || 'el profesional'} para el ${selectedDate} a las ${selectedTime}.`,
+        () => {
+          router.replace(`/(chat)/${chatId}`);
+        }
+      );
     } catch (error) {
       console.error('Error al guardar la reserva:', error);
-      setModalConfig({
-        visible: true,
-        type: 'error',
-        title: 'Error de reserva',
-        message: 'No se pudo registrar tu solicitud. Por favor intenta nuevamente.',
-        primaryButtonText: 'Reintentar',
-        secondaryButtonText: 'Cancelar',
-        onPrimaryPress: () => {
-          hideModal();
-          handleConfirmBooking();
-        },
-        onSecondaryPress: hideModal,
-      });
+      showModal('danger', 'No se pudo registrar tu solicitud. Por favor intenta nuevamente.');
     } finally {
       setLoading(false);
     }
@@ -207,37 +195,55 @@ export default function BookingScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+          accessibilityLabel="Volver"
+        >
           <Ionicons name="arrow-back" size={22} color={COLORS.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Agendar Servicio</Text>
-        <View style={{ width: 40 }} />
+        <View style={{ width: 44 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Info del Profesional */}
         <View style={styles.workerInfoCard}>
-          <Ionicons name="person-circle-outline" size={40} color={COLORS.primary} />
-          <View>
-            <Text style={styles.workerInfoLabel}>Trabajador seleccionado</Text>
-            <Text style={styles.workerInfoName}>{workerName || 'Carlos Rodríguez'}</Text>
+          <View style={styles.workerIconContainer}>
+            <Ionicons name="construct-outline" size={24} color={COLORS.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.workerInfoLabel}>Profesional a contratar</Text>
+            <Text style={styles.workerInfoName}>{workerName || 'Profesional GoodJob'}</Text>
+            {!!workerCategory && (
+              <Text style={styles.workerInfoCategory}>{workerCategory}</Text>
+            )}
           </View>
         </View>
 
         {/* Seleccionar Fecha */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Selecciona la fecha</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateRow}>
-            {DATES.map((item) => {
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.dateRow}
+          >
+            {availableDates.map((item) => {
               const isSelected = selectedDate === item.full;
               return (
                 <TouchableOpacity
                   key={item.full}
                   style={[styles.dateCard, isSelected && styles.selectedDateCard]}
                   onPress={() => setSelectedDate(item.full)}
+                  activeOpacity={0.8}
                 >
-                  <Text style={[styles.dayText, isSelected && styles.selectedText]}>{item.day}</Text>
-                  <Text style={[styles.numberText, isSelected && styles.selectedText]}>{item.number}</Text>
+                  <Text style={[styles.dayText, isSelected && styles.selectedText]}>
+                    {item.day}
+                  </Text>
+                  <Text style={[styles.numberText, isSelected && styles.selectedText]}>
+                    {item.number}
+                  </Text>
                 </TouchableOpacity>
               );
             })}
@@ -253,37 +259,43 @@ export default function BookingScreen() {
               return (
                 <TouchableOpacity
                   key={time}
-                  style={[styles.timeChip, isSelected && styles.selectedTimeChip]}
+                  style={[styles.timeSlot, isSelected && styles.selectedTimeSlot]}
                   onPress={() => setSelectedTime(time)}
+                  activeOpacity={0.8}
                 >
-                  <Text style={[styles.timeText, isSelected && styles.selectedTimeText]}>{time}</Text>
+                  <Ionicons
+                    name="time-outline"
+                    size={16}
+                    color={isSelected ? COLORS.onPrimary : COLORS.textSecondary}
+                  />
+                  <Text style={[styles.timeText, isSelected && styles.selectedText]}>
+                    {time}
+                  </Text>
                 </TouchableOpacity>
               );
             })}
           </View>
         </View>
 
-        {/* Detalles adicionales */}
+        {/* Detalles del trabajo */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Detalles del trabajo (Opcional)</Text>
+          <Text style={styles.sectionTitle}>Detalles o requerimientos (opcional)</Text>
           <TextInput
-            style={styles.notesInput}
-            placeholder="Describe brevemente lo que necesitas reparar o instalar..."
+            style={styles.textInput}
+            placeholder="Describe brevemente qué necesitas realizar (ej. fuga en lavabo, cambio de cerradura, revisión eléctrica)..."
             placeholderTextColor={COLORS.textSecondary}
             multiline
             numberOfLines={4}
-            textAlignVertical="top"
             value={description}
             onChangeText={setDescription}
+            textAlignVertical="top"
           />
         </View>
-      </ScrollView>
 
-      {/* Botón Flotante */}
-      <View style={styles.footer}>
+        {/* Botón Confirmar */}
         <TouchableOpacity
-          style={styles.confirmButton}
-          activeOpacity={0.8}
+          style={[styles.confirmButton, loading && styles.disabledButton]}
+          activeOpacity={0.85}
           onPress={handleConfirmBooking}
           disabled={loading}
         >
@@ -296,92 +308,18 @@ export default function BookingScreen() {
             </>
           )}
         </TouchableOpacity>
-      </View>
+      </ScrollView>
 
-      {/* Modal Personalizado */}
+      {/* Modal Reutilizable */}
       <CustomModal
-        visible={modalConfig.visible}
+        visible={modalVisible}
         type={modalConfig.type}
-        title={modalConfig.title}
         message={modalConfig.message}
-        primaryButtonText={modalConfig.primaryButtonText}
-        secondaryButtonText={modalConfig.secondaryButtonText}
-        onPrimaryPress={modalConfig.onPrimaryPress}
-        onSecondaryPress={modalConfig.onSecondaryPress}
+        onClose={handleModalClose}
       />
     </SafeAreaView>
   );
 }
-
-// Estilos del Modal
-const modalStyles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  container: {
-    width: '100%',
-    backgroundColor: COLORS.surface,
-    borderRadius: 20,
-    padding: 24,
-    alignItems: 'center',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-  iconContainer: {
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  message: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 20,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    width: '100%',
-  },
-  button: {
-    flex: 1,
-    height: 44,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  primaryButton: {
-    backgroundColor: COLORS.primary,
-  },
-  secondaryButton: {
-    backgroundColor: COLORS.surfaceLow,
-    borderWidth: 1,
-    borderColor: COLORS.surfaceVariant,
-  },
-  primaryButtonText: {
-    color: COLORS.onPrimary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  secondaryButtonText: {
-    color: COLORS.textPrimary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-});
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -397,9 +335,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: COLORS.surfaceLow,
     justifyContent: 'center',
     alignItems: 'center',
@@ -407,68 +345,84 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: COLORS.primary,
+    color: COLORS.textPrimary,
   },
   content: {
     paddingHorizontal: 20,
-    paddingBottom: 100,
+    paddingBottom: 40,
   },
   workerInfoCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
     backgroundColor: COLORS.surface,
+    padding: 16,
     borderRadius: 16,
-    padding: 14,
     borderWidth: 1,
     borderColor: COLORS.surfaceVariant,
-    marginVertical: 12,
+    marginBottom: 24,
+    gap: 14,
+  },
+  workerIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.surfaceLow,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   workerInfoLabel: {
     fontSize: 12,
     color: COLORS.textSecondary,
+    fontWeight: '500',
   },
   workerInfoName: {
     fontSize: 16,
     fontWeight: '700',
     color: COLORS.textPrimary,
+    marginTop: 2,
+  },
+  workerInfoCategory: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
+    marginTop: 2,
   },
   section: {
-    marginTop: 20,
+    marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    color: COLORS.primary,
+    color: COLORS.textPrimary,
     marginBottom: 12,
   },
   dateRow: {
     gap: 10,
   },
   dateCard: {
-    width: 64,
+    width: 66,
     height: 74,
-    borderRadius: 16,
     backgroundColor: COLORS.surface,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: COLORS.surfaceVariant,
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 4,
   },
   selectedDateCard: {
     backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
   },
   dayText: {
-    fontSize: 13,
+    fontSize: 12,
     color: COLORS.textSecondary,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   numberText: {
     fontSize: 18,
     fontWeight: '700',
     color: COLORS.textPrimary,
-    marginTop: 2,
   },
   selectedText: {
     color: COLORS.onPrimary,
@@ -478,59 +432,52 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 10,
   },
-  timeChip: {
-    paddingHorizontal: 16,
+  timeSlot: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
     paddingVertical: 12,
-    borderRadius: 12,
     backgroundColor: COLORS.surface,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.surfaceVariant,
   },
-  selectedTimeChip: {
+  selectedTimeSlot: {
     backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
   },
   timeText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: COLORS.textPrimary,
   },
-  selectedTimeText: {
-    color: COLORS.onPrimary,
-  },
-  notesInput: {
+  textInput: {
     backgroundColor: COLORS.surface,
-    borderRadius: 16,
     borderWidth: 1,
     borderColor: COLORS.surfaceVariant,
+    borderRadius: 14,
     padding: 14,
     fontSize: 14,
     color: COLORS.textPrimary,
-    height: 100,
-  },
-  footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: COLORS.surface,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.surfaceVariant,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    minHeight: 100,
   },
   confirmButton: {
     backgroundColor: COLORS.primary,
+    height: 52,
     borderRadius: 14,
-    height: 50,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
+    marginTop: 10,
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
   confirmButtonText: {
     color: COLORS.onPrimary,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
   },
 });

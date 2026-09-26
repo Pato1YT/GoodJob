@@ -1,5 +1,5 @@
-// Pantalla de Chat entre Usuario y Profesional
-import React, { useState } from 'react';
+// Pantalla de Chat en Tiempo Real (Conectada a Firestore con onSnapshot)
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -11,80 +11,181 @@ import {
   Platform,
   StatusBar,
   Image,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-const COLORS = {
-  background: '#F9F9FB',
-  surface: '#FFFFFF',
-  surfaceLow: '#F3F3F5',
-  surfaceVariant: '#E2E2E4',
-  textPrimary: '#1A1C1D',
-  textSecondary: '#4C4546',
-  primary: '#000000',
-  onPrimary: '#FFFFFF',
-};
+import { doc, getDoc } from 'firebase/firestore';
+import { chatService, workerService } from '../../src/data/firestore';
+import { ChatMessage, Worker } from '../../src/types';
+import { auth, db } from '../../src/config/firebase';
+import { getWorkerPhoto } from '../../src/utils/avatarUtils';
+import { appNotificationService } from '../../src/services/notificationManager';
+import { useThemeStore } from '../../src/utils/themeStore';
 
-interface Message {
-  id: string;
-  sender: 'user' | 'worker';
-  text: string;
-  time: string;
-}
-
-const MOCK_MESSAGES: Message[] = [
-  {
-    id: '1',
-    sender: 'worker',
-    text: '¡Hola! He recibido tu solicitud de servicio. ¿Podrías darme algún detalle extra del trabajo?',
-    time: '10:30 AM',
-  },
-  {
-    id: '2',
-    sender: 'user',
-    text: '¡Hola! Sí, necesito revisar un goteo bajo el lavabo de la cocina.',
-    time: '10:32 AM',
-  },
-  {
-    id: '3',
-    sender: 'worker',
-    text: 'Entendido, llevaré el kit de sellado y repuestos de tubería por si acaso. Nos vemos a la hora acordada.',
-    time: '10:35 AM',
-  },
+const QUICK_ACTIONS = [
+  'Hola, ¿tienes disponibilidad hoy?',
+  '¿Cuál es la cotización estimada?',
+  'Ya estoy en la dirección.',
+  '¿Qué materiales se requieren?',
 ];
 
+const DEFAULT_AVATAR =
+  'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=400';
+
 export default function ChatScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
+  const isDark = useThemeStore((state) => state.isDark);
+  const themeColors = useThemeStore((state) => state.colors);
+  const styles = React.useMemo(() => createStyles(themeColors, isDark), [themeColors, isDark]);
+
+  const { id } = useLocalSearchParams<{ id: string }>(); // puede ser chatId o workerId
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [partner, setPartner] = useState<{ name: string; photo: string; workerId?: string } | null>(null);
+  const flatListRef = useRef<FlatList>(null);
 
-  const handleSendMessage = () => {
-    if (!inputText.trim()) return;
+  const currentUser = auth.currentUser;
 
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      sender: 'user',
-      text: inputText.trim(),
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  useEffect(() => {
+    if (!id) return;
+
+    let unsubscribe: (() => void) | undefined;
+
+    const setupChat = async () => {
+      try {
+        setLoading(true);
+
+        // 1. Intentar resolver el interlocutor:
+        // Primero verificamos si `id` corresponde directamente a un documento de la colección 'chats'
+        let partnerFound = false;
+        try {
+          const chatDocSnap = await getDoc(doc(db, 'chats', id));
+          if (chatDocSnap.exists()) {
+            const chatData = chatDocSnap.data() as any;
+            const isMeWorker = currentUser && chatData.workerId === currentUser.uid;
+
+            if (isMeWorker) {
+              // Si soy el profesional, mi interlocutor es el cliente
+              const clientName = chatData.clientNameSnapshot || 'Cliente GoodJob';
+              const clientPhoto = chatData.clientPhotoSnapshot || DEFAULT_AVATAR;
+              setPartner({ name: clientName, photo: clientPhoto, workerId: undefined });
+            } else {
+              // Si soy el cliente, mi interlocutor es el profesional
+              const workerName = chatData.workerNameSnapshot || 'Profesional GoodJob';
+              const workerPhoto = getWorkerPhoto({
+                id: chatData.workerId,
+                userPhotoSnapshot: chatData.workerPhotoSnapshot,
+                userNameSnapshot: workerName,
+              });
+              setPartner({ name: workerName, photo: workerPhoto, workerId: chatData.workerId });
+            }
+            partnerFound = true;
+          }
+        } catch (chatLookupErr) {
+          console.log('Not a direct chat doc or permission issue, checking worker next:', chatLookupErr);
+        }
+
+        // Si no era un documento de chat, buscarlo como workerId en 'workers'
+        if (!partnerFound) {
+          try {
+            const workerData = await workerService.getById(id);
+            if (workerData) {
+              const w = workerData as any;
+              const name = `${w.firstName || ''} ${w.lastName || ''}`.trim() || workerData.userNameSnapshot || 'Profesional GoodJob';
+              const photo = getWorkerPhoto({ ...w, ...workerData, id: workerData.id || id });
+              setPartner({ name, photo, workerId: workerData.id || id });
+            } else {
+              setPartner({ name: 'Profesional GoodJob', photo: getWorkerPhoto({ id }), workerId: id });
+            }
+          } catch {
+            setPartner({ name: 'Profesional GoodJob', photo: getWorkerPhoto({ id }), workerId: id });
+          }
+        }
+
+        // 2. Suscribirse a mensajes en tiempo real
+        unsubscribe = chatService.subscribeToMessages(id, (liveMessages) => {
+          setMessages(liveMessages);
+          setLoading(false);
+        });
+      } catch (err) {
+        console.error('Error configurando chat:', err);
+        setLoading(false);
+      }
     };
 
-    setMessages((prev) => [...prev, newMessage]);
-    setInputText('');
+    setupChat();
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [id]);
+
+  const handleSendMessage = async (customText?: string) => {
+    const textToSend = (typeof customText === 'string' ? customText : inputText).trim();
+    if (!textToSend || !id || !currentUser) return;
+
+    if (!customText) {
+      setInputText('');
+    }
+    setSending(true);
+
+    try {
+      await chatService.sendMessage(id, {
+        chatId: id,
+        senderId: currentUser.uid,
+        content: textToSend,
+        type: 'text',
+      });
+
+      // Disparar notificación para el destinatario
+      if (partner?.name) {
+        // Enviar notificación local/push
+        appNotificationService.triggerLocalNotification({
+          title: `💬 Mensaje de ${currentUser.displayName || 'GoodJob'}`,
+          body: textToSend,
+          data: { relatedCollection: 'chats', relatedId: id },
+        });
+      }
+    } catch (error) {
+      console.error('Error al enviar mensaje:', error);
+      if (!customText) {
+        setInputText(textToSend);
+      }
+    } finally {
+      setSending(false);
+    }
   };
 
-  const renderMessageItem = ({ item }: { item: Message }) => {
-    const isMe = item.sender === 'user';
+  const renderMessageItem = ({ item }: { item: ChatMessage }) => {
+    const isMe = item.senderId === currentUser?.uid;
+    const timeFormatted = item.createdAt
+      ? new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : '';
+
     return (
-      <View style={[styles.messageBubbleContainer, isMe ? styles.myContainer : styles.otherContainer]}>
+      <View
+        style={[
+          styles.messageBubbleContainer,
+          isMe ? styles.myContainer : styles.otherContainer,
+        ]}
+      >
         <View style={[styles.messageBubble, isMe ? styles.myBubble : styles.otherBubble]}>
           <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.otherMessageText]}>
-            {item.text}
+            {item.content}
           </Text>
-          <Text style={[styles.timeText, isMe ? styles.myTimeText : styles.otherTimeText]}>
-            {item.time}
-          </Text>
+          {timeFormatted ? (
+            <Text style={[styles.timeText, isMe ? styles.myTimeText : styles.otherTimeText]}>
+              {timeFormatted}
+            </Text>
+          ) : null}
         </View>
       </View>
     );
@@ -92,62 +193,133 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.surface} />
+      <StatusBar barStyle={themeColors.statusBar} backgroundColor={themeColors.surface} />
 
       {/* Header del Chat */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={22} color={COLORS.primary} />
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+          accessibilityLabel="Volver"
+        >
+          <Ionicons name="arrow-back" size={22} color={themeColors.primary} />
         </TouchableOpacity>
 
-        <View style={styles.userInfo}>
+        <TouchableOpacity
+          style={styles.userInfo}
+          activeOpacity={0.7}
+          onPress={() => {
+            if (partner?.workerId) {
+              router.push(`/(workers)/${partner.workerId}`);
+            }
+          }}
+        >
           <Image
-            source={{ uri: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=400' }}
+            source={{ uri: partner?.photo || DEFAULT_AVATAR }}
             style={styles.avatar}
           />
           <View>
-            <Text style={styles.userName}>Carlos Rodríguez</Text>
+            <Text style={styles.userName}>{partner?.name || 'Cargando...'}</Text>
             <View style={styles.statusRow}>
               <View style={styles.onlineDot} />
               <Text style={styles.statusText}>En línea</Text>
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
 
-        <TouchableOpacity style={styles.iconButton}>
-          <Ionicons name="call-outline" size={20} color={COLORS.primary} />
+        <TouchableOpacity
+          style={styles.iconButton}
+          activeOpacity={0.7}
+          onPress={() => {
+            Alert.alert(
+              'Llamada telefónica',
+              `¿Deseas llamar a ${partner?.name || 'este profesional'}?`,
+              [
+                { text: 'Cancelar', style: 'cancel' },
+                { text: 'Llamar', onPress: () => {} },
+              ]
+            );
+          }}
+        >
+          <Ionicons name="call-outline" size={20} color={themeColors.primary} />
         </TouchableOpacity>
       </View>
 
-      {/* Lista de Mensajes */}
+      {/* Contenido / Lista de Mensajes */}
       <KeyboardAvoidingView
         style={styles.keyboardContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <FlatList
-          data={messages}
-          keyExtractor={(item) => item.id}
-          renderItem={renderMessageItem}
-          contentContainerStyle={styles.messagesList}
-          showsVerticalScrollIndicator={false}
-        />
+        {loading ? (
+          <View style={styles.centerLoading}>
+            <ActivityIndicator size="large" color={themeColors.primary} />
+            <Text style={styles.loadingText}>Conectando chat en tiempo real...</Text>
+          </View>
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            keyExtractor={(item) => item.id}
+            renderItem={renderMessageItem}
+            contentContainerStyle={styles.messagesList}
+            showsVerticalScrollIndicator={false}
+            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Ionicons name="chatbubble-ellipses-outline" size={48} color={themeColors.border} />
+                <Text style={styles.emptyTitle}>Inicia la conversación</Text>
+                <Text style={styles.emptySubtitle}>
+                  Escríbele tus dudas, detalles del trabajo o coordina la visita.
+                </Text>
+              </View>
+            }
+          />
+        )}
 
-        {/* Campo de Entrada de Texto */}
+        {/* Sugerencias de Mensajes Rápidos */}
+        <View style={styles.quickActionsWrapper}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.quickActionsContainer}
+          >
+            {QUICK_ACTIONS.map((action, idx) => (
+              <TouchableOpacity
+                key={idx}
+                style={styles.quickActionChip}
+                onPress={() => handleSendMessage(action)}
+                disabled={sending}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="sparkles-outline" size={13} color={themeColors.primary} style={{ marginRight: 4 }} />
+                <Text style={styles.quickActionText}>{action}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Input Bar */}
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.textInput}
             placeholder="Escribe un mensaje..."
-            placeholderTextColor={COLORS.textSecondary}
+            placeholderTextColor={themeColors.textSecondary}
             value={inputText}
             onChangeText={setInputText}
             multiline
+            maxLength={500}
           />
           <TouchableOpacity
-            style={[styles.sendButton, !inputText.trim() && styles.disabledSendButton]}
-            onPress={handleSendMessage}
-            disabled={!inputText.trim()}
+            style={[styles.sendButton, (!inputText.trim() || sending) && styles.sendButtonDisabled]}
+            onPress={() => handleSendMessage()}
+            disabled={!inputText.trim() || sending}
+            activeOpacity={0.8}
           >
-            <Ionicons name="send" size={18} color={COLORS.onPrimary} />
+            {sending ? (
+              <ActivityIndicator size="small" color={themeColors.onPrimary} />
+            ) : (
+              <Ionicons name="send" size={18} color={themeColors.onPrimary} />
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -155,10 +327,12 @@ export default function ChatScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+// --- Estilos de UI adaptados al Tema ---
+const createStyles = (COLORS: any, isDark: boolean) => StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: COLORS.background,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   header: {
     flexDirection: 'row',
@@ -171,9 +345,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: COLORS.surfaceLow,
     justifyContent: 'center',
     alignItems: 'center',
@@ -182,12 +356,12 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: COLORS.surfaceVariant,
   },
   userName: {
@@ -198,7 +372,7 @@ const styles = StyleSheet.create({
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     marginTop: 2,
   },
   onlineDot: {
@@ -212,9 +386,9 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
   iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: COLORS.surfaceLow,
     justifyContent: 'center',
     alignItems: 'center',
@@ -222,12 +396,42 @@ const styles = StyleSheet.create({
   keyboardContainer: {
     flex: 1,
   },
+  centerLoading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 10,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+  },
   messagesList: {
     paddingHorizontal: 16,
     paddingVertical: 16,
-    gap: 12,
+    flexGrow: 1,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    marginTop: 60,
+    gap: 8,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 18,
   },
   messageBubbleContainer: {
+    marginVertical: 4,
     width: '100%',
     flexDirection: 'row',
   },
@@ -238,10 +442,10 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   messageBubble: {
-    maxWidth: '80%',
+    maxWidth: '78%',
+    borderRadius: 18,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 18,
   },
   myBubble: {
     backgroundColor: COLORS.primary,
@@ -269,10 +473,35 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
   },
   myTimeText: {
-    color: COLORS.surfaceVariant,
+    color: 'rgba(255, 255, 255, 0.65)',
   },
   otherTimeText: {
     color: COLORS.textSecondary,
+  },
+  quickActionsWrapper: {
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.surfaceVariant,
+    backgroundColor: COLORS.surface,
+  },
+  quickActionsContainer: {
+    paddingHorizontal: 14,
+    gap: 8,
+  },
+  quickActionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surfaceLow,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceVariant,
+  },
+  quickActionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -286,23 +515,24 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
-    backgroundColor: COLORS.surfaceLow,
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    minHeight: 44,
     maxHeight: 100,
+    backgroundColor: COLORS.surfaceLow,
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     fontSize: 14,
     color: COLORS.textPrimary,
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  disabledSendButton: {
+  sendButtonDisabled: {
     opacity: 0.4,
   },
 });

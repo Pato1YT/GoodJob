@@ -14,10 +14,12 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../../src/config/firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { auth, db } from '../../src/config/firebase';
 import { userService } from '../../src/data/firestore';
 import { CustomModal, ModalType } from '../../src/components/CustomModal';
 import { getSpanishAuthErrorMessage } from '../../src/utils/firebaseErrors';
+import { getWorkerPhoto } from '../../src/utils/avatarUtils';
 import {
   CustomInput,
   CustomButton,
@@ -25,6 +27,17 @@ import {
   colors,
   spacing,
 } from '../../src/components/common';
+
+const WORKER_CATEGORIES = [
+  'Fontanería',
+  'Electricidad',
+  'Carpintería',
+  'Limpieza',
+  'Pintura',
+  'Jardinería',
+  'Construcción',
+  'Reparación de Electrodomésticos',
+];
 
 // ============================================================================
 // HELPERS
@@ -78,6 +91,10 @@ export default function SignupScreen() {
     password: '',
     confirmPassword: '',
     role: 'employer' as 'employer' | 'worker' | 'both',
+    category: 'Fontanería',
+    hourlyRate: '250',
+    yearsExperience: '3',
+    bio: '',
   });
   
   const [agreeToTerms, setAgreeToTerms] = useState(false);
@@ -156,14 +173,51 @@ export default function SignupScreen() {
         formData.email,
         formData.password
       );
+      const uid = userCredential.user.uid;
 
-      await userService.create(userCredential.user.uid, {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        phone: formData.phone,
+      // 1. Guardar usuario en la colección 'users'
+      await userService.create(uid, {
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
         role: formData.role,
       });
+
+      // 2. Si se registra como trabajador, crear su perfil profesional en 'workers'
+      if (formData.role === 'worker' || formData.role === 'both') {
+        const fullName = `${formData.firstName.trim()} ${formData.lastName.trim()}`;
+        const autoAvatar = getWorkerPhoto({
+          id: uid,
+          firstName: formData.firstName.trim(),
+          userNameSnapshot: fullName,
+        });
+
+        await setDoc(doc(db, 'workers', uid), {
+          id: uid,
+          userId: uid,
+          firstName: formData.firstName.trim(),
+          lastName: formData.lastName.trim(),
+          userNameSnapshot: fullName,
+          userPhotoSnapshot: autoAvatar,
+          category: formData.category,
+          title: formData.category,
+          roleTitle: formData.category,
+          hourlyRate: parseFloat(formData.hourlyRate) || 250,
+          yearsExperience: parseInt(formData.yearsExperience, 10) || 3,
+          bio: formData.bio.trim() || `Profesional especializado en servicios de ${formData.category}. Puntual y comprometido con la calidad.`,
+          avgRating: 5.0,
+          totalReviews: 1,
+          completedJobs: 0,
+          verified: true,
+          available: true,
+          status: 'active',
+          skills: [formData.category, 'Servicios a domicilio', 'Garantía de trabajo'],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          createdBy: uid,
+        });
+      }
 
       router.replace('/(tabs)');
     } catch (err: any) {
@@ -314,6 +368,53 @@ export default function SignupScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Campos Profesionales Condicionales si es Trabajador */}
+          {(formData.role === 'worker' || formData.role === 'both') && (
+            <View style={styles.workerExtraContainer}>
+              <Text style={styles.workerSectionTitle}>Tu Especialidad u Oficio</Text>
+              <View style={styles.categoryChipsContainer}>
+                {WORKER_CATEGORIES.map((cat) => {
+                  const isSelected = formData.category === cat;
+                  return (
+                    <TouchableOpacity
+                      key={cat}
+                      style={[styles.categoryChip, isSelected && styles.categoryChipActive]}
+                      onPress={() => handleInputChange('category', cat)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.categoryChipText, isSelected && styles.categoryChipTextActive]}>
+                        {cat}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputMiniLabel}>Tarifa por hora ($ MXN)</Text>
+                  <CustomInput
+                    placeholder="250"
+                    value={formData.hourlyRate}
+                    onChangeText={(value) => handleInputChange('hourlyRate', value)}
+                    keyboardType="numeric"
+                    editable={!loading}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputMiniLabel}>Años de experiencia</Text>
+                  <CustomInput
+                    placeholder="3"
+                    value={formData.yearsExperience}
+                    onChangeText={(value) => handleInputChange('yearsExperience', value)}
+                    keyboardType="numeric"
+                    editable={!loading}
+                  />
+                </View>
+              </View>
+            </View>
+          )}
+
           <TouchableOpacity
             style={styles.termsContainer}
             onPress={() => setAgreeToTerms(!agreeToTerms)}
@@ -436,6 +537,52 @@ const styles = StyleSheet.create({
   },
   roleButtonTextActive: {
     color: colors.secondary,
+  },
+  workerExtraContainer: {
+    backgroundColor: '#F3F4F6',
+    padding: spacing.md,
+    borderRadius: 12,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  workerSectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: spacing.sm,
+  },
+  categoryChipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: spacing.md,
+  },
+  categoryChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+  },
+  categoryChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  categoryChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  categoryChipTextActive: {
+    color: '#FFFFFF',
+  },
+  inputMiniLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textLight,
+    marginBottom: 4,
   },
   termsContainer: {
     flexDirection: 'row',

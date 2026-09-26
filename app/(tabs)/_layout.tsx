@@ -1,17 +1,21 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useThemeStore } from '../../src/utils/themeStore';
 
 export default function TabsLayout() {
+  const colors = useThemeStore((s) => s.colors);
+  const isDark = useThemeStore((s) => s.isDark);
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#000000',
-        tabBarInactiveTintColor: '#8E8E93',
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: isDark ? '#71717A' : '#8E8E93',
         tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopColor: '#E5E7EB',
+          backgroundColor: colors.tabBarBg,
+          borderTopColor: colors.tabBarBorder,
         },
       }}
     >
@@ -30,6 +34,15 @@ export default function TabsLayout() {
           title: 'Buscar',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="search" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="activity"
+        options={{
+          title: 'Actividad',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="time-outline" size={size} color={color} />
           ),
         }}
       />

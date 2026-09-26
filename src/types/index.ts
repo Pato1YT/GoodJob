@@ -183,10 +183,20 @@ export interface Booking {
   id: string;
   userId: string; // FK → users (empleador)
   workerId: string; // FK → workers
-  serviceType: string;
+  serviceType?: string;
   categoryId?: string; // FK → categories
+  workerNameSnapshot?: string;
+  workerCategorySnapshot?: string;
+  workerPhotoSnapshot?: string;
+  clientNameSnapshot?: string;
+  clientPhoneSnapshot?: string;
+  clientPhotoSnapshot?: string;
+  isReviewed?: boolean;
+  date?: string;
+  timeSlot?: string;
+  notes?: string;
   status: 'pending' | 'accepted' | 'in_progress' | 'completed' | 'cancelled';
-  scheduledDate: Date;
+  scheduledDate?: Date;
   scheduledTime?: string; // HH:mm
   location?: string;
   latitude?: number;
@@ -194,7 +204,7 @@ export interface Booking {
   description?: string;
   estimatedCost?: number;
   finalCost?: number;
-  createdBy: string;
+  createdBy?: string;
   createdAt: Date;
   updatedAt: Date;
 }
