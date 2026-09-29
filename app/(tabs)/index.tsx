@@ -195,26 +195,58 @@ export default function HomeScreen() {
     }
   };
 
-  // Asigna un ícono según el nombre de la categoría si no hay un iconName guardado
+  // Asigna un ícono representativo según el nombre de la categoría
   const renderCategoryIcon = (category: Category) => {
     const color = isDark ? themeColors.primary : COLORS.primary;
     const size = 26;
     const nameLower = category.name.toLowerCase();
 
-    if (nameLower.includes('fontan') || nameLower.includes('plumb')) {
+    // Plomería / Fontanería
+    if (nameLower.includes('fontan') || nameLower.includes('plomb') || nameLower.includes('plomer')) {
       return <MaterialIcons name="plumbing" size={size} color={color} />;
     }
-    if (nameLower.includes('limp') || nameLower.includes('clean')) {
-      return <MaterialIcons name="cleaning-services" size={size} color={color} />;
-    }
-    if (nameLower.includes('jard') || nameLower.includes('grass')) {
-      return <MaterialIcons name="grass" size={size} color={color} />;
-    }
+    // Electricidad
     if (nameLower.includes('electr')) {
       return <MaterialIcons name="electrical-services" size={size} color={color} />;
     }
+    // Limpieza
+    if (nameLower.includes('limp') || nameLower.includes('clean')) {
+      return <MaterialCommunityIcons name="broom" size={size} color={color} />;
+    }
+    // Jardinería
+    if (nameLower.includes('jard') || nameLower.includes('grass') || nameLower.includes('garden')) {
+      return <MaterialCommunityIcons name="flower" size={size} color={color} />;
+    }
+    // Carpintería
+    if (nameLower.includes('carpin') || nameLower.includes('wood')) {
+      return <MaterialCommunityIcons name="hammer-wrench" size={size} color={color} />;
+    }
+    // Pintura
+    if (nameLower.includes('pint') || nameLower.includes('paint')) {
+      return <MaterialIcons name="format-paint" size={size} color={color} />;
+    }
+    // Refrigeración / Climas / Aire acondicionado
+    if (nameLower.includes('refrig') || nameLower.includes('aire') || nameLower.includes('clima')) {
+      return <MaterialCommunityIcons name="snowflake" size={size} color={color} />;
+    }
+    // Construcción / Albañilería
+    if (nameLower.includes('construc') || nameLower.includes('albañil') || nameLower.includes('albanil')) {
+      return <MaterialIcons name="construction" size={size} color={color} />;
+    }
+    // Cerrajería
+    if (nameLower.includes('cerraj') || nameLower.includes('llav') || nameLower.includes('lock')) {
+      return <MaterialCommunityIcons name="key-variant" size={size} color={color} />;
+    }
+    // Electrodomésticos / Reparación
+    if (nameLower.includes('electro') || nameLower.includes('lavador') || nameLower.includes('appliance')) {
+      return <MaterialCommunityIcons name="washing-machine" size={size} color={color} />;
+    }
+    // Mecánica / Autos
+    if (nameLower.includes('mecanic') || nameLower.includes('auto') || nameLower.includes('coche')) {
+      return <MaterialCommunityIcons name="car-wrench" size={size} color={color} />;
+    }
 
-    return <Ionicons name="build-outline" size={size} color={color} />;
+    return <Ionicons name="construct-outline" size={size} color={color} />;
   };
 
   // Loader centrado mientras descarga de Firestore
@@ -235,7 +267,7 @@ export default function HomeScreen() {
       <View style={[styles.header, isDark && { backgroundColor: themeColors.background, borderBottomColor: themeColors.border }]}>
         <View style={styles.logoContainer}>
           <MaterialIcons name="work" size={28} color={themeColors.primary} />
-          <Text style={[styles.logoText, isDark && { color: themeColors.text }]}>GoodJobs</Text>
+          <Text style={[styles.logoText, isDark && { color: themeColors.text }]}>GoodJob</Text>
         </View>
 
         <View style={styles.headerRightActions}>
@@ -279,7 +311,7 @@ export default function HomeScreen() {
             })()}
           </Text>
           <Text style={[styles.userNameGreeting, isDark && { color: themeColors.text }]}>
-            {userName ? `Bienvenido, ${userName.split(' ')[0]}` : 'Bienvenido a GoodJobs'}
+            {userName ? `Bienvenido, ${userName.split(' ')[0]}` : 'Bienvenido a GoodJob'}
           </Text>
         </View>
 
