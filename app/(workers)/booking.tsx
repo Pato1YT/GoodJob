@@ -21,19 +21,7 @@ import { CustomModal, ModalType } from '../../src/components/CustomModal';
 import { auth, db } from '../../src/config/firebase';
 import { getWorkerPhoto } from '../../src/utils/avatarUtils';
 import { appNotificationService } from '../../src/services/notificationManager';
-
-const COLORS = {
-  background: '#F9F9FB',
-  surface: '#FFFFFF',
-  surfaceLow: '#F3F3F5',
-  surfaceVariant: '#E2E2E4',
-  textPrimary: '#1A1C1D',
-  textSecondary: '#4C4546',
-  primary: '#000000',
-  onPrimary: '#FFFFFF',
-  error: '#BA1A1A',
-  success: '#2E7D32',
-};
+import { useThemeStore } from '../../src/utils/themeStore';
 
 const TIME_SLOTS = ['09:00 AM', '11:00 AM', '02:00 PM', '04:00 PM', '06:00 PM'];
 
@@ -64,6 +52,10 @@ function generateUpcomingDays() {
 }
 
 export default function BookingScreen() {
+  const isDark = useThemeStore((s) => s.isDark);
+  const themeColors = useThemeStore((s) => s.colors);
+  const styles = React.useMemo(() => createStyles(themeColors, isDark), [themeColors, isDark]);
+
   const { workerId, workerName, workerCategory } = useLocalSearchParams<{
     workerId?: string;
     workerName?: string;
@@ -191,7 +183,7 @@ export default function BookingScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+      <StatusBar barStyle={themeColors.statusBar} backgroundColor={themeColors.background} />
 
       {/* Header */}
       <View style={styles.header}>
@@ -200,7 +192,7 @@ export default function BookingScreen() {
           onPress={() => router.back()}
           accessibilityLabel="Volver"
         >
-          <Ionicons name="arrow-back" size={22} color={COLORS.primary} />
+          <Ionicons name="arrow-back" size={22} color={themeColors.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Agendar Servicio</Text>
         <View style={{ width: 44 }} />
@@ -210,7 +202,7 @@ export default function BookingScreen() {
         {/* Info del Profesional */}
         <View style={styles.workerInfoCard}>
           <View style={styles.workerIconContainer}>
-            <Ionicons name="construct-outline" size={24} color={COLORS.primary} />
+            <Ionicons name="construct-outline" size={24} color={themeColors.primary} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.workerInfoLabel}>Profesional a contratar</Text>
@@ -266,7 +258,7 @@ export default function BookingScreen() {
                   <Ionicons
                     name="time-outline"
                     size={16}
-                    color={isSelected ? COLORS.onPrimary : COLORS.textSecondary}
+                    color={isSelected ? themeColors.onPrimary : themeColors.textSecondary}
                   />
                   <Text style={[styles.timeText, isSelected && styles.selectedText]}>
                     {time}
@@ -283,7 +275,7 @@ export default function BookingScreen() {
           <TextInput
             style={styles.textInput}
             placeholder="Describe brevemente qué necesitas realizar (ej. fuga en lavabo, cambio de cerradura, revisión eléctrica)..."
-            placeholderTextColor={COLORS.textSecondary}
+            placeholderTextColor={themeColors.textSecondary}
             multiline
             numberOfLines={4}
             value={description}
@@ -300,11 +292,11 @@ export default function BookingScreen() {
           disabled={loading}
         >
           {loading ? (
-            <ActivityIndicator color={COLORS.onPrimary} />
+            <ActivityIndicator color={themeColors.onPrimary} />
           ) : (
             <>
               <Text style={styles.confirmButtonText}>Confirmar y Solicitar</Text>
-              <Ionicons name="checkmark-circle-outline" size={20} color={COLORS.onPrimary} />
+              <Ionicons name="checkmark-circle-outline" size={20} color={themeColors.onPrimary} />
             </>
           )}
         </TouchableOpacity>
@@ -321,7 +313,7 @@ export default function BookingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any, isDark: boolean) => StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -354,11 +346,11 @@ const styles = StyleSheet.create({
   workerInfoCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.card || COLORS.surface,
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: COLORS.surfaceVariant,
+    borderColor: COLORS.border || COLORS.surfaceVariant,
     marginBottom: 24,
     gap: 14,
   },
@@ -402,10 +394,10 @@ const styles = StyleSheet.create({
   dateCard: {
     width: 66,
     height: 74,
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.card || COLORS.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: COLORS.surfaceVariant,
+    borderColor: COLORS.border || COLORS.surfaceVariant,
     justifyContent: 'center',
     alignItems: 'center',
     gap: 4,
@@ -438,10 +430,10 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.card || COLORS.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: COLORS.surfaceVariant,
+    borderColor: COLORS.border || COLORS.surfaceVariant,
   },
   selectedTimeSlot: {
     backgroundColor: COLORS.primary,
@@ -453,9 +445,9 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
   },
   textInput: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.inputBg || COLORS.surfaceLow,
     borderWidth: 1,
-    borderColor: COLORS.surfaceVariant,
+    borderColor: COLORS.border || COLORS.surfaceVariant,
     borderRadius: 14,
     padding: 14,
     fontSize: 14,

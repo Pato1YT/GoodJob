@@ -197,7 +197,7 @@ export default function HomeScreen() {
 
   // Asigna un ícono según el nombre de la categoría si no hay un iconName guardado
   const renderCategoryIcon = (category: Category) => {
-    const color = COLORS.primary;
+    const color = isDark ? themeColors.primary : COLORS.primary;
     const size = 26;
     const nameLower = category.name.toLowerCase();
 

@@ -35,6 +35,7 @@ import {
   Paintbrush,
   Snowflake,
 } from 'lucide-react-native';
+import { useThemeStore } from '../utils/themeStore';
 
 // ============================================================================
 // COLORES Y ESTILOS GLOBALES
@@ -136,15 +137,23 @@ export const CustomInput = React.forwardRef<TextInput, CustomInputProps>(
     },
     ref
   ) => {
+    const isDark = useThemeStore((s) => s.isDark);
+    const themeColors = useThemeStore((s) => s.colors);
     const [showPassword, setShowPassword] = React.useState(!secureTextEntry);
     const IconComponent = getIconComponent(icon);
 
     return (
       <View style={styles.inputContainer}>
-        <View style={[styles.inputWrapper, error ? styles.inputError : undefined]}>
+        <View
+          style={[
+            styles.inputWrapper,
+            isDark && { backgroundColor: themeColors.inputBg, borderColor: themeColors.border },
+            error ? styles.inputError : undefined,
+          ]}
+        >
           {IconComponent && (
             <View style={styles.inputIcon}>
-              <IconComponent size={20} color={colors.textLight} strokeWidth={2} />
+              <IconComponent size={20} color={isDark ? themeColors.textSecondary : colors.textLight} strokeWidth={2} />
             </View>
           )}
           <TextInput
@@ -156,8 +165,8 @@ export const CustomInput = React.forwardRef<TextInput, CustomInputProps>(
             keyboardType={keyboardType}
             editable={editable}
             autoCapitalize={autoCapitalize}
-            placeholderTextColor={colors.textLight}
-            style={[styles.input, icon ? styles.inputWithIcon : undefined]}
+            placeholderTextColor={isDark ? themeColors.textSecondary : colors.textLight}
+            style={[styles.input, isDark && { color: themeColors.text }, icon ? styles.inputWithIcon : undefined]}
           />
           {secureTextEntry && (
             <TouchableOpacity
@@ -165,9 +174,9 @@ export const CustomInput = React.forwardRef<TextInput, CustomInputProps>(
               hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
             >
               {showPassword ? (
-                <Eye size={20} color={colors.textLight} strokeWidth={2} />
+                <Eye size={20} color={isDark ? themeColors.textSecondary : colors.textLight} strokeWidth={2} />
               ) : (
-                <EyeOff size={20} color={colors.textLight} strokeWidth={2} />
+                <EyeOff size={20} color={isDark ? themeColors.textSecondary : colors.textLight} strokeWidth={2} />
               )}
             </TouchableOpacity>
           )}
@@ -203,9 +212,14 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
   size = 'medium',
   icon,
 }) => {
+  const isDark = useThemeStore((s) => s.isDark);
+  const themeColors = useThemeStore((s) => s.colors);
   const isDisabled = disabled || loading;
   const IconComponent = getIconComponent(icon);
-  const iconColor = variant === 'secondary' ? colors.primary : colors.secondary;
+  const iconColor =
+    variant === 'secondary'
+      ? (isDark ? themeColors.text : colors.primary)
+      : (isDark ? themeColors.onPrimary : colors.secondary);
 
   return (
     <TouchableOpacity
@@ -213,6 +227,8 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
         styles.button,
         styles[`button_${variant}`],
         styles[`button_${size}`],
+        isDark && variant === 'primary' && { backgroundColor: themeColors.primary },
+        isDark && variant === 'secondary' && { backgroundColor: themeColors.surfaceLow, borderColor: themeColors.border, borderWidth: 1 },
         isDisabled && styles.buttonDisabled,
       ]}
       onPress={onPress}
@@ -221,7 +237,7 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
     >
       {loading ? (
         <ActivityIndicator
-          color={variant === 'secondary' ? colors.primary : colors.secondary}
+          color={variant === 'secondary' ? (isDark ? themeColors.text : colors.primary) : (isDark ? themeColors.onPrimary : colors.secondary)}
         />
       ) : (
         <View style={styles.buttonContent}>
@@ -238,6 +254,8 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
               styles.buttonText,
               styles[`buttonText_${variant}`],
               styles[`buttonText_${size}`],
+              isDark && variant === 'primary' && { color: themeColors.onPrimary },
+              isDark && variant === 'secondary' && { color: themeColors.text },
             ]}
           >
             {title}
@@ -259,6 +277,7 @@ interface LinkButtonProps {
 }
 
 export const LinkButton: React.FC<LinkButtonProps> = ({ text, onPress, icon }) => {
+  const isDark = useThemeStore((s) => s.isDark);
   const IconComponent = getIconComponent(icon);
 
   return (
@@ -266,12 +285,12 @@ export const LinkButton: React.FC<LinkButtonProps> = ({ text, onPress, icon }) =
       {IconComponent && (
         <IconComponent
           size={14}
-          color={colors.accent}
+          color={isDark ? '#60A5FA' : colors.accent}
           strokeWidth={2}
           style={styles.linkIcon}
         />
       )}
-      <Text style={styles.linkText}>{text}</Text>
+      <Text style={[styles.linkText, isDark && { color: '#60A5FA' }]}>{text}</Text>
     </TouchableOpacity>
   );
 };

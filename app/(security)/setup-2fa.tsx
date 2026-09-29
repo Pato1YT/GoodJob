@@ -5,11 +5,14 @@ import { CustomInput, CustomButton, colors, spacing } from '../../src/components
 import { CustomModal, ModalType } from '../../src/components/CustomModal';
 import { enviarCodigoOTP, verificarCodigoOTP, activar2FA } from '../../src/utils/emailOtp';
 import { auth } from '../../src/config/firebase';
+import { useThemeStore } from '../../src/utils/themeStore';
 
 type Step = 'inicio' | 'confirmar' | 'listo';
 
 export default function Setup2FAScreen() {
   const router = useRouter();
+  const isDark = useThemeStore((s) => s.isDark);
+  const themeColors = useThemeStore((s) => s.colors);
   const [step, setStep] = useState<Step>('inicio');
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -70,13 +73,13 @@ export default function Setup2FAScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
+      style={[styles.container, isDark && { backgroundColor: themeColors.background }]}
     >
       <View style={styles.content}>
         {step === 'inicio' && (
           <>
-            <Text style={styles.title}>Activar verificación en dos pasos</Text>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.title, isDark && { color: themeColors.text }]}>Activar verificación en dos pasos</Text>
+            <Text style={[styles.subtitle, isDark && { color: themeColors.textSecondary }]}>
               Te enviaremos un código a tu correo para confirmar la activación
             </Text>
             <CustomButton
@@ -90,8 +93,8 @@ export default function Setup2FAScreen() {
 
         {step === 'confirmar' && (
           <>
-            <Text style={styles.title}>Revisa tu correo</Text>
-            <Text style={styles.subtitle}>Ingresa el código de 6 dígitos que te enviamos</Text>
+            <Text style={[styles.title, isDark && { color: themeColors.text }]}>Revisa tu correo</Text>
+            <Text style={[styles.subtitle, isDark && { color: themeColors.textSecondary }]}>Ingresa el código de 6 dígitos que te enviamos</Text>
 
             <CustomInput
               placeholder="Código de 6 dígitos"
@@ -113,10 +116,9 @@ export default function Setup2FAScreen() {
 
         {step === 'listo' && (
           <>
-            <Text style={styles.title}>¡Listo!</Text>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.title, isDark && { color: themeColors.text }]}>¡Listo!</Text>
+            <Text style={[styles.subtitle, isDark && { color: themeColors.textSecondary }]}>
               La verificación en dos pasos por correo quedó activada en tu cuenta correctamente.
-              
             </Text>
             <CustomButton
               title="Volver al perfil"

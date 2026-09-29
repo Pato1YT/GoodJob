@@ -12,9 +12,12 @@ import { getSpanishAuthErrorMessage } from '../../src/utils/firebaseErrors';
 import { verificarCodigoOTP, enviarCodigoOTP } from '../../src/utils/emailOtp';
 import { getPendingUid, clearPendingUid } from '../../src/utils/pendingAuthStore';
 import { auth } from '../../src/config/firebase';
+import { useThemeStore } from '../../src/utils/themeStore';
 
 export default function TwoFactorAuthScreen() {
   const router = useRouter();
+  const isDark = useThemeStore((s) => s.isDark);
+  const themeColors = useThemeStore((s) => s.colors);
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [reenviando, setReenviando] = useState(false);
@@ -79,11 +82,11 @@ export default function TwoFactorAuthScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
+      style={[styles.container, isDark && { backgroundColor: themeColors.background }]}
     >
       <View style={styles.content}>
-        <Text style={styles.title}>Verificación en dos pasos</Text>
-        <Text style={styles.subtitle}>Te enviamos un código de 6 dígitos a tu correo electrónico</Text>
+        <Text style={[styles.title, isDark && { color: themeColors.text }]}>Verificación en dos pasos</Text>
+        <Text style={[styles.subtitle, isDark && { color: themeColors.textSecondary }]}>Te enviamos un código de 6 dígitos a tu correo electrónico</Text>
 
         <CustomInput
           placeholder="Código de 6 dígitos"

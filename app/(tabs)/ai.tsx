@@ -219,46 +219,46 @@ export default function AIScreen() {
     }
 
     return (
-      <View style={styles.diagnosisCard}>
+      <View style={[styles.diagnosisCard, isDark && { backgroundColor: themeColors.card, borderColor: themeColors.border }]}>
         {/* Cabecera del diagnóstico */}
         <View style={styles.diagHeader}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.diagTitle}>{diag.summary}</Text>
-            <Text style={styles.diagCategory}>Especialidad: {diag.categoryName}</Text>
+            <Text style={[styles.diagTitle, isDark && { color: themeColors.text }]}>{diag.summary}</Text>
+            <Text style={[styles.diagCategory, isDark && { color: '#60A5FA' }]}>Especialidad: {diag.categoryName}</Text>
           </View>
-          <View style={[styles.urgencyBadge, { backgroundColor: urgencyBadgeBg }]}>
-            <Text style={[styles.urgencyText, { color: urgencyBadgeText }]}>
+          <View style={[styles.urgencyBadge, { backgroundColor: isDark ? (diag.urgency === 'alta' ? '#451A1A' : diag.urgency === 'media' ? '#3B2A10' : '#143823') : urgencyBadgeBg }]}>
+            <Text style={[styles.urgencyText, { color: isDark ? (diag.urgency === 'alta' ? '#F87171' : diag.urgency === 'media' ? '#FBBF24' : '#34D399') : urgencyBadgeText }]}>
               {diag.urgency.toUpperCase()}
             </Text>
           </View>
         </View>
 
         {/* Explicación */}
-        <Text style={styles.diagExplanation}>{diag.explanation}</Text>
+        <Text style={[styles.diagExplanation, isDark && { color: themeColors.textSecondary }]}>{diag.explanation}</Text>
 
         {/* Cifras clave (Costo estimado & Tiempo) */}
         <View style={styles.estimatesRow}>
-          <View style={styles.estimateBox}>
-            <Ionicons name="pricetag-outline" size={16} color={COLORS.primary} />
-            <Text style={styles.estimateLabel}>Rango Estimado</Text>
-            <Text style={styles.estimateValue}>{diag.estimatedCostRange}</Text>
+          <View style={[styles.estimateBox, isDark && { backgroundColor: themeColors.surfaceLow }]}>
+            <Ionicons name="pricetag-outline" size={16} color={themeColors.primary} />
+            <Text style={[styles.estimateLabel, isDark && { color: themeColors.textSecondary }]}>Rango Estimado</Text>
+            <Text style={[styles.estimateValue, isDark && { color: themeColors.text }]}>{diag.estimatedCostRange}</Text>
           </View>
 
-          <View style={styles.estimateBox}>
-            <Ionicons name="time-outline" size={16} color={COLORS.primary} />
-            <Text style={styles.estimateLabel}>Tiempo Promedio</Text>
-            <Text style={styles.estimateValue}>{diag.estimatedTime}</Text>
+          <View style={[styles.estimateBox, isDark && { backgroundColor: themeColors.surfaceLow }]}>
+            <Ionicons name="time-outline" size={16} color={themeColors.primary} />
+            <Text style={[styles.estimateLabel, isDark && { color: themeColors.textSecondary }]}>Tiempo Promedio</Text>
+            <Text style={[styles.estimateValue, isDark && { color: themeColors.text }]}>{diag.estimatedTime}</Text>
           </View>
         </View>
 
         {/* Materiales recomendados */}
         {diag.recommendedMaterials && diag.recommendedMaterials.length > 0 && (
-          <View style={styles.materialsContainer}>
-            <Text style={styles.materialsTitle}>Posibles materiales / refacciones:</Text>
+          <View style={[styles.materialsContainer, isDark && { backgroundColor: themeColors.surfaceLow }]}>
+            <Text style={[styles.materialsTitle, isDark && { color: themeColors.textSecondary }]}>Posibles materiales / refacciones:</Text>
             <View style={styles.materialsList}>
               {diag.recommendedMaterials.map((mat, idx) => (
-                <View key={idx} style={styles.materialChip}>
-                  <Text style={styles.materialChipText}>• {mat}</Text>
+                <View key={idx} style={[styles.materialChip, isDark && { backgroundColor: themeColors.surface, borderColor: themeColors.border, borderWidth: 1 }]}>
+                  <Text style={[styles.materialChipText, isDark && { color: themeColors.text }]}>• {mat}</Text>
                 </View>
               ))}
             </View>
@@ -267,31 +267,31 @@ export default function AIScreen() {
 
         {/* Especialistas recomendados */}
         {workers && workers.length > 0 && (
-          <View style={styles.workersSection}>
-            <Text style={styles.workersTitle}>Especialistas recomendados:</Text>
+          <View style={[styles.workersSection, isDark && { borderTopColor: themeColors.border }]}>
+            <Text style={[styles.workersTitle, isDark && { color: themeColors.text }]}>Especialistas recomendados:</Text>
             {workers.map((w: any) => {
               const name = w.userNameSnapshot || `${w.firstName || ''} ${w.lastName || ''}`.trim() || 'Profesional GoodJob';
               const photo = getWorkerPhoto(w);
               const rating = w.avgRating ? Number(w.avgRating).toFixed(1) : '5.0';
 
               return (
-                <View key={w.id} style={styles.workerItemCard}>
+                <View key={w.id} style={[styles.workerItemCard, isDark && { backgroundColor: themeColors.surfaceLow, borderColor: themeColors.border, borderWidth: 1 }]}>
                   <Image source={{ uri: photo }} style={styles.workerAvatar} />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.workerName}>{name}</Text>
+                    <Text style={[styles.workerName, isDark && { color: themeColors.text }]}>{name}</Text>
                     <View style={styles.workerRatingRow}>
-                      <Ionicons name="star" size={12} color={COLORS.primary} />
-                      <Text style={styles.workerRatingText}>{rating}</Text>
-                      <Text style={styles.workerCategoryText}>• {w.category || w.bio || diag.categoryName}</Text>
+                      <Ionicons name="star" size={12} color="#FBBF24" />
+                      <Text style={[styles.workerRatingText, isDark && { color: themeColors.text }]}>{rating}</Text>
+                      <Text style={[styles.workerCategoryText, isDark && { color: themeColors.textSecondary }]}>• {w.category || w.bio || diag.categoryName}</Text>
                     </View>
                   </View>
 
                   <TouchableOpacity
-                    style={styles.hireBtn}
+                    style={[styles.hireBtn, isDark && { backgroundColor: themeColors.primary }]}
                     onPress={() => router.push(`/(workers)/${w.id}`)}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.hireBtnText}>Ver Perfil</Text>
+                    <Text style={[styles.hireBtnText, isDark && { color: themeColors.onPrimary }]}>Ver Perfil</Text>
                   </TouchableOpacity>
                 </View>
               );
@@ -308,8 +308,8 @@ export default function AIScreen() {
     return (
       <View style={[styles.messageWrapper, isAI ? styles.aiWrapper : styles.userWrapper]}>
         {isAI && (
-          <View style={styles.aiAvatar}>
-            <Ionicons name="sparkles" size={16} color={COLORS.onPrimary} />
+          <View style={[styles.aiAvatar, isDark && { backgroundColor: themeColors.surfaceLow }]}>
+            <Ionicons name="sparkles" size={16} color={themeColors.primary} />
           </View>
         )}
 
@@ -321,8 +321,22 @@ export default function AIScreen() {
 
           {/* Texto común */}
           {!!item.text && (
-            <View style={[styles.textBubble, isAI ? styles.aiBubble : styles.userBubble]}>
-              <Text style={[styles.bubbleText, isAI ? styles.aiBubbleText : styles.userBubbleText]}>
+            <View
+              style={[
+                styles.textBubble,
+                isAI
+                  ? [styles.aiBubble, isDark && { backgroundColor: themeColors.surface, borderColor: themeColors.border }]
+                  : [styles.userBubble, isDark && { backgroundColor: themeColors.primary }],
+              ]}
+            >
+              <Text
+                style={[
+                  styles.bubbleText,
+                  isAI
+                    ? [styles.aiBubbleText, isDark && { color: themeColors.text }]
+                    : [styles.userBubbleText, isDark && { color: themeColors.onPrimary }],
+                ]}
+              >
                 {item.text}
               </Text>
             </View>
@@ -331,7 +345,7 @@ export default function AIScreen() {
           {/* Tarjeta de Diagnóstico estructurado */}
           {item.diagnosis && renderDiagnosisCard(item.diagnosis, item.recommendedWorkers)}
 
-          <Text style={[styles.timeText, isAI ? styles.aiTimeText : styles.userTimeText]}>
+          <Text style={[styles.timeText, isAI ? styles.aiTimeText : styles.userTimeText, isDark && { color: themeColors.textSecondary }]}>
             {item.timestamp}
           </Text>
         </View>

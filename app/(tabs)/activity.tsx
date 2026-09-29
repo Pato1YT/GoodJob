@@ -660,7 +660,7 @@ export default function ActivityScreen() {
 
                         {/* Botón de Chat con el cliente */}
                         <TouchableOpacity
-                          style={styles.workerChatBtn}
+                          style={[styles.workerChatBtn, isDark && { backgroundColor: themeColors.surfaceLow, borderColor: themeColors.border }]}
                           onPress={async () => {
                             const currentUser = auth.currentUser;
                             if (!currentUser) return;
@@ -684,8 +684,8 @@ export default function ActivityScreen() {
                           }}
                           activeOpacity={0.8}
                         >
-                          <Ionicons name="chatbubble-ellipses-outline" size={16} color={COLORS.primary} />
-                          <Text style={styles.workerChatBtnText}>Contactar al Cliente</Text>
+                          <Ionicons name="chatbubble-ellipses-outline" size={16} color={themeColors.primary} />
+                          <Text style={[styles.workerChatBtnText, isDark && { color: themeColors.text }]}>Contactar al Cliente</Text>
                         </TouchableOpacity>
                       </View>
                     );
@@ -745,13 +745,13 @@ export default function ActivityScreen() {
 
                         {/* Banner destacado para calificar si el trabajo fue completado y aún no tiene reseña */}
                         {booking.status === 'completed' && !isReviewed && (
-                          <View style={styles.completedNoticeBanner}>
-                            <View style={styles.completedNoticeIcon}>
-                              <Ionicons name="checkmark-done-circle" size={24} color={COLORS.success} />
+                          <View style={[styles.completedNoticeBanner, isDark && { backgroundColor: '#064E3B', borderColor: '#065F46' }]}>
+                            <View style={[styles.completedNoticeIcon, isDark && { backgroundColor: '#022C22' }]}>
+                              <Ionicons name="checkmark-done-circle" size={24} color="#34D399" />
                             </View>
                             <View style={{ flex: 1 }}>
-                              <Text style={styles.completedNoticeTitle}>¡Servicio Concluido!</Text>
-                              <Text style={styles.completedNoticeDesc}>
+                              <Text style={[styles.completedNoticeTitle, isDark && { color: '#6EE7B7' }]}>¡Servicio Concluido!</Text>
+                              <Text style={[styles.completedNoticeDesc, isDark && { color: '#A7F3D0' }]}>
                                 El profesional ha finalizado el trabajo. Cuéntanos cómo fue tu experiencia.
                               </Text>
                             </View>
@@ -761,14 +761,14 @@ export default function ActivityScreen() {
                         {/* Botón de Calificación si está completada o disponible para calificar */}
                         <View style={styles.bookingCardFooter}>
                           <TouchableOpacity
-                            style={styles.cardSecondaryBtn}
+                            style={[styles.cardSecondaryBtn, isDark && { backgroundColor: themeColors.surfaceLow, borderColor: themeColors.border }]}
                             onPress={() => router.push(`/(workers)/${booking.workerId}`)}
                           >
-                            <Text style={styles.cardSecondaryBtnText}>Ver Perfil</Text>
+                            <Text style={[styles.cardSecondaryBtnText, isDark && { color: themeColors.text }]}>Ver Perfil</Text>
                           </TouchableOpacity>
 
                           <TouchableOpacity
-                            style={styles.cardPrimaryBtn}
+                            style={[styles.cardPrimaryBtn, isDark && { backgroundColor: themeColors.primary }]}
                             onPress={async () => {
                               const currentUser = auth.currentUser;
                               if (!currentUser) return;
@@ -784,8 +784,8 @@ export default function ActivityScreen() {
                               router.push(`/(chat)/${chatId}`);
                             }}
                           >
-                            <Ionicons name="chatbubble-ellipses-outline" size={16} color={COLORS.onPrimary} />
-                            <Text style={styles.cardPrimaryBtnText}>Abrir Chat</Text>
+                            <Ionicons name="chatbubble-ellipses-outline" size={16} color={themeColors.onPrimary} />
+                            <Text style={[styles.cardPrimaryBtnText, isDark && { color: themeColors.onPrimary }]}>Abrir Chat</Text>
                           </TouchableOpacity>
                         </View>
 
@@ -794,8 +794,9 @@ export default function ActivityScreen() {
                           <TouchableOpacity
                             style={[
                               styles.rateWorkerBtn,
-                              !isReviewed && styles.rateWorkerBtnHighlighted,
-                              isReviewed && styles.ratedWorkerBtn,
+                              isDark && { backgroundColor: themeColors.surfaceLow, borderColor: themeColors.border },
+                              !isReviewed && (isDark ? { backgroundColor: themeColors.primary, borderColor: themeColors.primary } : styles.rateWorkerBtnHighlighted),
+                              isReviewed && (isDark ? { backgroundColor: themeColors.surfaceLow, borderColor: themeColors.border, opacity: 0.7 } : styles.ratedWorkerBtn),
                             ]}
                             onPress={() => {
                               if (isReviewed) {
@@ -809,22 +810,23 @@ export default function ActivityScreen() {
                             <Ionicons
                               name={isReviewed ? 'checkmark-circle' : 'star'}
                               size={18}
-                              color={isReviewed ? COLORS.success : COLORS.onPrimary}
+                              color={isReviewed ? (isDark ? '#34D399' : COLORS.success) : (isDark ? themeColors.onPrimary : COLORS.onPrimary)}
                             />
                             <Text
                               style={[
                                 styles.rateWorkerBtnText,
-                                !isReviewed && styles.rateWorkerBtnHighlightedText,
-                                isReviewed && styles.ratedWorkerBtnText,
+                                isDark && { color: themeColors.text },
+                                !isReviewed && (isDark ? { color: themeColors.onPrimary } : styles.rateWorkerBtnHighlightedText),
+                                isReviewed && (isDark ? { color: '#34D399' } : styles.ratedWorkerBtnText),
                               ]}
                             >
                               {isReviewed ? 'Servicio Calificado' : '⭐ Calificar y Opinar Ahora'}
                             </Text>
                           </TouchableOpacity>
                         ) : (
-                          <View style={styles.pendingCompletionHint}>
-                            <Ionicons name="time-outline" size={14} color={COLORS.textSecondary} />
-                            <Text style={styles.pendingCompletionHintText}>
+                          <View style={[styles.pendingCompletionHint, isDark && { backgroundColor: themeColors.surfaceLow }]}>
+                            <Ionicons name="time-outline" size={14} color={themeColors.textSecondary} />
+                            <Text style={[styles.pendingCompletionHintText, isDark && { color: themeColors.textSecondary }]}>
                               La calificación se habilitará cuando el profesional finalice el servicio.
                             </Text>
                           </View>
@@ -1015,21 +1017,21 @@ export default function ActivityScreen() {
                   return (
                     <TouchableOpacity
                       key={fav.id}
-                      style={styles.favCard}
+                      style={[styles.favCard, isDark && { backgroundColor: themeColors.card, borderColor: themeColors.border }]}
                       activeOpacity={0.85}
                       onPress={() => router.push(`/(workers)/${fav.workerId}`)}
                     >
                       <Image source={{ uri: photo }} style={styles.favAvatar} />
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.favWorkerName}>{name}</Text>
+                        <Text style={[styles.favWorkerName, isDark && { color: themeColors.text }]}>{name}</Text>
                         <View style={styles.favRatingRow}>
-                          <Ionicons name="star" size={14} color={COLORS.primary} />
-                          <Text style={styles.favRatingText}>{rating}</Text>
-                          <Text style={styles.dotSeparator}>•</Text>
-                          <Text style={styles.favSubtext}>Guardado en favoritos</Text>
+                          <Ionicons name="star" size={14} color="#FBBF24" />
+                          <Text style={[styles.favRatingText, isDark && { color: themeColors.text }]}>{rating}</Text>
+                          <Text style={[styles.dotSeparator, isDark && { color: themeColors.textSecondary }]}>•</Text>
+                          <Text style={[styles.favSubtext, isDark && { color: themeColors.textSecondary }]}>Guardado en favoritos</Text>
                         </View>
                       </View>
-                      <Ionicons name="chevron-forward" size={18} color={COLORS.primary} />
+                      <Ionicons name="chevron-forward" size={18} color={themeColors.primary} />
                     </TouchableOpacity>
                   );
                 })
@@ -1049,9 +1051,9 @@ export default function ActivityScreen() {
         <TouchableWithoutFeedback onPress={() => setReviewModalVisible(false)}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
-              <View style={styles.reviewModalCard}>
-                <Text style={styles.reviewModalTitle}>Calificar Servicio</Text>
-                <Text style={styles.reviewModalSubtitle}>
+              <View style={[styles.reviewModalCard, isDark && { backgroundColor: themeColors.surface, borderColor: themeColors.border, borderWidth: 1 }]}>
+                <Text style={[styles.reviewModalTitle, isDark && { color: themeColors.text }]}>Calificar Servicio</Text>
+                <Text style={[styles.reviewModalSubtitle, isDark && { color: themeColors.textSecondary }]}>
                   ¿Cómo fue tu experiencia con {selectedBookingForReview?.workerNameSnapshot || 'el profesional'}?
                 </Text>
 
@@ -1067,7 +1069,7 @@ export default function ActivityScreen() {
                       <Ionicons
                         name={star <= reviewRating ? 'star' : 'star-outline'}
                         size={34}
-                        color={star <= reviewRating ? COLORS.star : COLORS.surfaceVariant}
+                        color={star <= reviewRating ? '#FBBF24' : (isDark ? themeColors.border : COLORS.surfaceVariant)}
                       />
                     </TouchableOpacity>
                   ))}
@@ -1075,9 +1077,9 @@ export default function ActivityScreen() {
 
                 {/* Comentario */}
                 <TextInput
-                  style={styles.reviewTextInput}
+                  style={[styles.reviewTextInput, isDark && { backgroundColor: themeColors.inputBg, borderColor: themeColors.border, color: themeColors.text }]}
                   placeholder="Escribe tu opinión (ej. Puntual, excelente acabado, muy educado)..."
-                  placeholderTextColor={COLORS.textSecondary}
+                  placeholderTextColor={isDark ? '#9CA3AF' : COLORS.textSecondary}
                   multiline
                   numberOfLines={4}
                   value={reviewComment}
@@ -1088,22 +1090,22 @@ export default function ActivityScreen() {
                 {/* Botones */}
                 <View style={styles.reviewModalActions}>
                   <TouchableOpacity
-                    style={styles.reviewModalCancelBtn}
+                    style={[styles.reviewModalCancelBtn, isDark && { backgroundColor: themeColors.surfaceLow }]}
                     onPress={() => setReviewModalVisible(false)}
                     disabled={submittingReview}
                   >
-                    <Text style={styles.reviewModalCancelText}>Cancelar</Text>
+                    <Text style={[styles.reviewModalCancelText, isDark && { color: themeColors.text }]}>Cancelar</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[styles.reviewModalSubmitBtn, submittingReview && { opacity: 0.6 }]}
+                    style={[styles.reviewModalSubmitBtn, isDark && { backgroundColor: themeColors.primary }, submittingReview && { opacity: 0.6 }]}
                     onPress={handleSubmitReview}
                     disabled={submittingReview}
                   >
                     {submittingReview ? (
-                      <ActivityIndicator size="small" color={COLORS.onPrimary} />
+                      <ActivityIndicator size="small" color={themeColors.onPrimary} />
                     ) : (
-                      <Text style={styles.reviewModalSubmitText}>Enviar Reseña</Text>
+                      <Text style={[styles.reviewModalSubmitText, isDark && { color: themeColors.onPrimary }]}>Enviar Reseña</Text>
                     )}
                   </TouchableOpacity>
                 </View>
