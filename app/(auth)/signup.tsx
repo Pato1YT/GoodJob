@@ -27,6 +27,7 @@ import {
   colors,
   spacing,
 } from '../../src/components/common';
+import { useThemeStore } from '../../src/utils/themeStore';
 
 const WORKER_CATEGORIES = [
   'Fontanería',
@@ -83,6 +84,8 @@ const getPasswordStrengthLabel = (strength: number): string => {
 
 export default function SignupScreen() {
   const router = useRouter();
+  const isDark = useThemeStore((s) => s.isDark);
+  const themeColors = useThemeStore((s) => s.colors);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -234,15 +237,15 @@ export default function SignupScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
+      style={[styles.container, isDark && { backgroundColor: themeColors.background }]}
     >
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>Crear Cuenta</Text>
-          <Text style={styles.subtitle}>Únete a GoodJob</Text>
+          <Text style={[styles.title, isDark && { color: themeColors.text }]}>Crear Cuenta</Text>
+          <Text style={[styles.subtitle, isDark && { color: themeColors.textSecondary }]}>Únete a GoodJob</Text>
         </View>
 
         <View style={styles.form}>
@@ -329,11 +332,12 @@ export default function SignupScreen() {
             editable={!loading}
           />
 
-          <Text style={styles.roleLabel}>¿Qué eres?</Text>
+          <Text style={[styles.roleLabel, isDark && { color: themeColors.text }]}>¿Qué eres?</Text>
           <View style={styles.roleContainer}>
             <TouchableOpacity
               style={[
                 styles.roleButton,
+                isDark && { borderColor: themeColors.border, backgroundColor: themeColors.surfaceLow },
                 formData.role === 'employer' && styles.roleButtonActive,
               ]}
               onPress={() => handleInputChange('role', 'employer')}
@@ -342,6 +346,7 @@ export default function SignupScreen() {
               <Text
                 style={[
                   styles.roleButtonText,
+                  isDark && { color: themeColors.textSecondary },
                   formData.role === 'employer' && styles.roleButtonTextActive,
                 ]}
               >
@@ -352,6 +357,7 @@ export default function SignupScreen() {
             <TouchableOpacity
               style={[
                 styles.roleButton,
+                isDark && { borderColor: themeColors.border, backgroundColor: themeColors.surfaceLow },
                 formData.role === 'worker' && styles.roleButtonActive,
               ]}
               onPress={() => handleInputChange('role', 'worker')}
@@ -360,6 +366,7 @@ export default function SignupScreen() {
               <Text
                 style={[
                   styles.roleButtonText,
+                  isDark && { color: themeColors.textSecondary },
                   formData.role === 'worker' && styles.roleButtonTextActive,
                 ]}
               >
@@ -370,19 +377,29 @@ export default function SignupScreen() {
 
           {/* Campos Profesionales Condicionales si es Trabajador */}
           {(formData.role === 'worker' || formData.role === 'both') && (
-            <View style={styles.workerExtraContainer}>
-              <Text style={styles.workerSectionTitle}>Tu Especialidad u Oficio</Text>
+            <View style={[styles.workerExtraContainer, isDark && { backgroundColor: themeColors.surfaceLow, borderColor: themeColors.border }]}>
+              <Text style={[styles.workerSectionTitle, isDark && { color: themeColors.text }]}>Tu Especialidad u Oficio</Text>
               <View style={styles.categoryChipsContainer}>
                 {WORKER_CATEGORIES.map((cat) => {
                   const isSelected = formData.category === cat;
                   return (
                     <TouchableOpacity
                       key={cat}
-                      style={[styles.categoryChip, isSelected && styles.categoryChipActive]}
+                      style={[
+                        styles.categoryChip,
+                        isDark && { backgroundColor: themeColors.surface, borderColor: themeColors.border },
+                        isSelected && styles.categoryChipActive,
+                      ]}
                       onPress={() => handleInputChange('category', cat)}
                       activeOpacity={0.7}
                     >
-                      <Text style={[styles.categoryChipText, isSelected && styles.categoryChipTextActive]}>
+                      <Text
+                        style={[
+                          styles.categoryChipText,
+                          isDark && { color: themeColors.textSecondary },
+                          isSelected && styles.categoryChipTextActive,
+                        ]}
+                      >
                         {cat}
                       </Text>
                     </TouchableOpacity>
@@ -392,7 +409,7 @@ export default function SignupScreen() {
 
               <View style={{ flexDirection: 'row', gap: 12 }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.inputMiniLabel}>Tarifa por hora ($ MXN)</Text>
+                  <Text style={[styles.inputMiniLabel, isDark && { color: themeColors.textSecondary }]}>Tarifa por hora ($ MXN)</Text>
                   <CustomInput
                     placeholder="250"
                     value={formData.hourlyRate}
@@ -402,7 +419,7 @@ export default function SignupScreen() {
                   />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.inputMiniLabel}>Años de experiencia</Text>
+                  <Text style={[styles.inputMiniLabel, isDark && { color: themeColors.textSecondary }]}>Años de experiencia</Text>
                   <CustomInput
                     placeholder="3"
                     value={formData.yearsExperience}
@@ -420,13 +437,17 @@ export default function SignupScreen() {
             onPress={() => setAgreeToTerms(!agreeToTerms)}
           >
             <View
-              style={[styles.checkbox, agreeToTerms && styles.checkboxActive]}
+              style={[
+                styles.checkbox,
+                isDark && { borderColor: themeColors.border },
+                agreeToTerms && styles.checkboxActive,
+              ]}
             >
               {agreeToTerms && <Text style={styles.checkmark}>✓</Text>}
             </View>
-            <Text style={styles.termsText}>
+            <Text style={[styles.termsText, isDark && { color: themeColors.textSecondary }]}>
               Acepto los{' '}
-              <Text style={styles.termsLink}>Términos y Condiciones</Text>
+              <Text style={[styles.termsLink, isDark && { color: themeColors.primary }]}>Términos y Condiciones</Text>
             </Text>
           </TouchableOpacity>
         </View>
@@ -441,7 +462,7 @@ export default function SignupScreen() {
         />
 
         <View style={styles.loginContainer}>
-          <Text style={styles.loginText}>¿Ya tienes cuenta? </Text>
+          <Text style={[styles.loginText, isDark && { color: themeColors.textSecondary }]}>¿Ya tienes cuenta? </Text>
           <LinkButton text="Inicia sesión" onPress={() => router.push('/login')} />
         </View>
       </ScrollView>

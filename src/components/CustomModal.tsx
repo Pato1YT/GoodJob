@@ -8,6 +8,7 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useThemeStore } from '../utils/themeStore';
 
 export type ModalType = 'primary' | 'success' | 'info' | 'warning' | 'danger';
 
@@ -60,6 +61,8 @@ export const CustomModal: React.FC<CustomModalProps> = ({
   onClose,
   onSecondaryPress,
 }) => {
+  const isDark = useThemeStore((s) => s.isDark);
+  const themeColors = useThemeStore((s) => s.colors);
   const config = TYPE_CONFIG[type] || TYPE_CONFIG.primary;
 
   return (
@@ -72,25 +75,29 @@ export const CustomModal: React.FC<CustomModalProps> = ({
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
-            <View style={styles.modalCard}>
+            <View style={[styles.modalCard, isDark && { backgroundColor: themeColors.surface, borderColor: themeColors.border, borderWidth: 1 }]}>
               {/* Icono de Tipo */}
               <View style={[styles.iconContainer, { backgroundColor: `${config.color}15` }]}>
                 <Ionicons name={config.icon} size={36} color={config.color} />
               </View>
 
               {/* Título y Mensaje */}
-              <Text style={styles.title}>{title || config.defaultTitle}</Text>
-              <Text style={styles.message}>{message}</Text>
+              <Text style={[styles.title, isDark && { color: themeColors.text }]}>{title || config.defaultTitle}</Text>
+              <Text style={[styles.message, isDark && { color: themeColors.textSecondary }]}>{message}</Text>
 
               {/* Botones */}
               <View style={styles.buttonGroup}>
                 {secondaryButtonText && (
                   <TouchableOpacity
-                    style={[styles.button, styles.secondaryButton]}
+                    style={[
+                      styles.button,
+                      styles.secondaryButton,
+                      isDark && { backgroundColor: themeColors.surfaceLow, borderColor: themeColors.border, borderWidth: 1 },
+                    ]}
                     activeOpacity={0.8}
                     onPress={onSecondaryPress || onClose}
                   >
-                    <Text style={styles.secondaryButtonText}>{secondaryButtonText}</Text>
+                    <Text style={[styles.secondaryButtonText, isDark && { color: themeColors.text }]}>{secondaryButtonText}</Text>
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity
