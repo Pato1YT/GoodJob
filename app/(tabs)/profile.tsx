@@ -25,6 +25,7 @@ import { Address } from '../../src/types';
 import { auth, db } from '../../src/config/firebase';
 import { CustomModal, ModalType } from '../../src/components/CustomModal';
 import { useThemeStore } from '../../src/utils/themeStore';
+import { getCurrentUserLocation } from '../../src/utils/locationHelper';
 
 const COLORS = {
   primary: '#000000',
@@ -93,6 +94,7 @@ export default function ProfileScreen() {
   const [address, setAddress] = useState<Address | null>(null);
   const [addressModalVisible, setAddressModalVisible] = useState(false);
   const [savingAddress, setSavingAddress] = useState(false);
+  const [detectingGPS, setDetectingGPS] = useState(false);
   const [addressForm, setAddressForm] = useState({
     street: '',
     number: '',
@@ -100,6 +102,7 @@ export default function ProfileScreen() {
     city: '',
     state: '',
     zipCode: '',
+    references: '',
   });
 
   // Estados para Métodos de Pago reales en Firestore
@@ -235,6 +238,7 @@ export default function ProfileScreen() {
                   city: userAddress.city || '',
                   state: userAddress.state || '',
                   zipCode: userAddress.zipCode || '',
+                  references: (userAddress as any).references || '',
                 });
               }
             }
@@ -378,9 +382,36 @@ export default function ProfileScreen() {
         city: address.city || '',
         state: address.state || '',
         zipCode: address.zipCode || '',
+        references: (address as any).references || '',
       });
     }
     setAddressModalVisible(true);
+  };
+
+  const [coords, setCoords] = useState<{ lat: number; lng: number }>({ lat: 0, lng: 0 });
+
+  const handleDetectGPS = async () => {
+    try {
+      setDetectingGPS(true);
+      const res = await getCurrentUserLocation();
+      if (res) {
+        setAddressForm((prev) => ({
+          ...prev,
+          street: res.street || '',
+          number: res.number || '',
+          neighborhood: res.neighborhood || '',
+          city: res.city || '',
+          state: res.state || '',
+          zipCode: res.zipCode || '',
+        }));
+        setCoords({ lat: res.latitude, lng: res.longitude });
+        showFeedbackModal('success', `Ubicación GPS detectada correctamente:\n${res.formattedAddress}\n\nPuedes agregar referencias visuales adicionales abajo.`);
+      }
+    } catch (err) {
+      showFeedbackModal('danger', 'No se pudo obtener la ubicación GPS.');
+    } finally {
+      setDetectingGPS(false);
+    }
   };
 
   const handleSaveAddress = async () => {
@@ -401,12 +432,15 @@ export default function ProfileScreen() {
         city: addressForm.city.trim(),
         state: addressForm.state.trim(),
         zipCode: addressForm.zipCode.trim(),
-      });
+        references: addressForm.references.trim(),
+        lat: coords.lat || (address?.lat || 0),
+        lng: coords.lng || (address?.lng || 0),
+      } as any);
 
       const updated = await addressService.getDefaultByUserId(currentUser.uid);
       setAddress(updated);
       setAddressModalVisible(false);
-      showFeedbackModal('success', 'Dirección actualizada correctamente.');
+      showFeedbackModal('success', 'Dirección actualizada correctamente con coordenadas GPS.');
     } catch (e) {
       showFeedbackModal('danger', 'No se pudo guardar la dirección.');
     } finally {
@@ -1202,8 +1236,25 @@ export default function ProfileScreen() {
                 </View>
                 <Text style={styles.photoModalTitle}>Dirección Principal</Text>
                 <Text style={styles.photoModalSubtitle}>
-                  Ingresa tu domicilio para calcular la proximidad de los profesionales.
+                  Ingresa tu domicilio o usa tu ubicación actual para que los profesionales lleguen con precisión.
                 </Text>
+
+                {/* Botón para detectar ubicación GPS automática */}
+                <TouchableOpacity
+                  style={[styles.detectGpsButton, detectingGPS && { opacity: 0.7 }]}
+                  onPress={handleDetectGPS}
+                  disabled={detectingGPS || savingAddress}
+                  activeOpacity={0.8}
+                >
+                  {detectingGPS ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Ionicons name="navigate" size={18} color="#FFFFFF" />
+                      <Text style={styles.detectGpsButtonText}>Usar mi ubicación GPS actual</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
 
                 <View style={styles.addressFormContainer}>
                   <View style={styles.addressRow}>
@@ -1260,6 +1311,17 @@ export default function ProfileScreen() {
                     placeholderTextColor={COLORS.textSecondary}
                     value={addressForm.state}
                     onChangeText={(val) => setAddressForm((prev) => ({ ...prev, state: val }))}
+                    editable={!savingAddress}
+                  />
+
+                  <TextInput
+                    style={[styles.addressInput, { height: 60, textAlignVertical: 'top', paddingTop: 10 }]}
+                    placeholder="Referencias de llegada (ej. Fachada blanca, portón negro, timbre derecho)"
+                    placeholderTextColor={COLORS.textSecondary}
+                    value={addressForm.references}
+                    onChangeText={(val) => setAddressForm((prev) => ({ ...prev, references: val }))}
+                    multiline
+                    numberOfLines={2}
                     editable={!savingAddress}
                   />
                 </View>
@@ -1938,6 +2000,27 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 8,
+  },
+  detectGpsButton: {
+    width: '100%',
+    height: 44,
+    backgroundColor: '#000000',
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  detectGpsButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
   addressFormContainer: {
     width: '100%',

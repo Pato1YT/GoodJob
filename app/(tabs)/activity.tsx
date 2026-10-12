@@ -35,6 +35,7 @@ import { auth, db } from '../../src/config/firebase';
 import { getWorkerPhoto } from '../../src/utils/avatarUtils';
 import { appNotificationService } from '../../src/services/notificationManager';
 import { useThemeStore } from '../../src/utils/themeStore';
+import { openNavigationToAddress } from '../../src/utils/locationHelper';
 
 const COLORS = {
   background: '#F9F9FB',
@@ -601,6 +602,35 @@ export default function ActivityScreen() {
                           </View>
                           {renderStatusBadge(b.status || 'pending')}
                         </View>
+
+                        {/* Dirección o Ubicación del Cliente: Protegida según el estado */}
+                        {!!b.location && (
+                          isPending ? (
+                            <View style={[styles.bookingLocationBox, isDark && { backgroundColor: themeColors.surfaceLow, borderColor: themeColors.border }]}>
+                              <Ionicons name="shield-outline" size={16} color={COLORS.textSecondary} />
+                              <Text style={[styles.bookingLocationText, isDark && { color: themeColors.textSecondary }]} numberOfLines={1}>
+                                📍 Zona: {b.location.includes(',') ? b.location.split(',').slice(1).join(',').trim() : 'Ubicación reservada'} • Se revelará al aceptar
+                              </Text>
+                            </View>
+                          ) : (
+                            <View style={[styles.bookingLocationBox, isDark && { backgroundColor: themeColors.surfaceLow, borderColor: themeColors.border }]}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                                <Ionicons name="location" size={16} color={COLORS.error} />
+                                <Text style={[styles.bookingLocationText, isDark && { color: themeColors.text }]} numberOfLines={2}>
+                                  {b.location}
+                                </Text>
+                              </View>
+                              <TouchableOpacity
+                                style={[styles.mapsNavButton, isDark && { backgroundColor: themeColors.primary }]}
+                                onPress={() => openNavigationToAddress(b.latitude, b.longitude, b.location)}
+                                activeOpacity={0.8}
+                              >
+                                <Ionicons name="navigate" size={14} color={isDark ? themeColors.onPrimary : '#FFFFFF'} />
+                                <Text style={[styles.mapsNavButtonText, isDark && { color: themeColors.onPrimary }]}>Ver en Maps</Text>
+                              </TouchableOpacity>
+                            </View>
+                          )
+                        )}
 
                         {!!b.notes && (
                           <View style={[styles.bookingNotesContainer, isDark && { backgroundColor: themeColors.surfaceLow }]}>
@@ -1582,6 +1612,39 @@ const styles = StyleSheet.create({
   subTabTextActive: {
     fontWeight: '700',
     color: COLORS.primary,
+  },
+  bookingLocationBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    gap: 8,
+  },
+  bookingLocationText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#374151',
+    flex: 1,
+  },
+  mapsNavButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#000000',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 4,
+  },
+  mapsNavButtonText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   // Acciones del Trabajador
   workerActionRow: {

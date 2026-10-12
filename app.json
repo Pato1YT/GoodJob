@@ -33,7 +33,13 @@
       ],
       "expo-font",
       "expo-notifications",
-      "expo-image-picker"
+      "expo-image-picker",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "GoodJob necesita acceder a tu ubicación para que los profesionales puedan llegar a tu domicilio."
+        }
+      ]
     ],
     "extra": {
       "router": {
