@@ -39,6 +39,13 @@
         {
           "locationWhenInUsePermission": "GoodJob necesita acceder a tu ubicación para que los profesionales puedan llegar a tu domicilio."
         }
+      ],
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.goodjob.app",
+          "enableGooglePay": true
+        }
       ]
     ],
     "extra": {

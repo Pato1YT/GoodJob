@@ -19,6 +19,10 @@ if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.addE
   window.addEventListener('error', resizeObserveErrorHandler);
 }
 
+import { StripeProvider } from '@stripe/stripe-react-native';
+
+const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || '';
+
 export default function RootLayout() {
   const { loading } = useAuth();
   const initTheme = useThemeStore((s) => s.initTheme);
@@ -53,7 +57,7 @@ export default function RootLayout() {
     );
   }
 
-  return (
+  const content = (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="(auth)" />
@@ -62,5 +66,19 @@ export default function RootLayout() {
       <Stack.Screen name="(chat)" />
       <Stack.Screen name="(security)" />
     </Stack>
+  );
+
+  // En web o cuando no hay módulo nativo inicializado, renderizar directamente sin que truene el SDK nativo
+  if (Platform.OS === 'web' || !STRIPE_PUBLISHABLE_KEY) {
+    return content;
+  }
+
+  return (
+    <StripeProvider
+      publishableKey={STRIPE_PUBLISHABLE_KEY}
+      merchantIdentifier="merchant.com.goodjob.app"
+    >
+      {content}
+    </StripeProvider>
   );
 }
