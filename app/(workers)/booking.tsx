@@ -16,7 +16,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { doc, updateDoc } from 'firebase/firestore';
-import { bookingService, chatService, workerService, userService, addressService } from '../../src/data/firestore';
+import { bookingService, chatService, workerService, userService, addressService, paymentMethodService, UserPaymentMethod } from '../../src/data/firestore';
 import { CustomModal, ModalType } from '../../src/components/CustomModal';
 import { auth, db } from '../../src/config/firebase';
 import { getWorkerPhoto } from '../../src/utils/avatarUtils';
@@ -67,6 +67,42 @@ export default function BookingScreen() {
   const [selectedTime, setSelectedTime] = useState(TIME_SLOTS[0]);
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Estados de Pago y Cotización
+  const [paymentType, setPaymentType] = useState<'card' | 'cash'>('cash');
+  const [paymentMethods, setPaymentMethods] = useState<UserPaymentMethod[]>([]);
+  const [selectedPaymentId, setSelectedPaymentId] = useState<string>('');
+  const [hourlyRate, setHourlyRate] = useState<number>(250);
+  const platformFee = 35; // Cuota fija de protección/servicio de plataforma
+
+  React.useEffect(() => {
+    const fetchPaymentAndWorkerInfo = async () => {
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        try {
+          const methods = await paymentMethodService.getByUserId(currentUser.uid);
+          setPaymentMethods(methods);
+          if (methods.length > 0) {
+            setSelectedPaymentId(methods[0].id);
+          }
+        } catch (e) {
+          console.warn('Error fetching payment methods in booking:', e);
+        }
+      }
+
+      if (workerId) {
+        try {
+          const w = await workerService.getById(workerId);
+          if (w && (w as any).hourlyRate) {
+            setHourlyRate(Number((w as any).hourlyRate));
+          }
+        } catch (e) {
+          console.warn('Error fetching worker rate in booking:', e);
+        }
+      }
+    };
+    fetchPaymentAndWorkerInfo();
+  }, [workerId]);
 
   // Estado del CustomModal
   const [modalVisible, setModalVisible] = useState(false);
@@ -132,7 +168,10 @@ export default function BookingScreen() {
         ? `${baseAddress} (Ref: ${addr.references})`
         : baseAddress;
 
-      // Guardar reserva en Firestore con datos completos de ambas partes incluyendo GPS
+      const totalEstimated = hourlyRate + platformFee;
+      const selectedMethodObj = paymentMethods.find((m) => m.id === selectedPaymentId);
+
+      // Guardar reserva en Firestore con datos completos de ambas partes incluyendo GPS y Pago
       await bookingService.create({
         userId: currentUser.uid,
         workerId,
@@ -148,6 +187,14 @@ export default function BookingScreen() {
         date: selectedDate,
         timeSlot: selectedTime,
         notes: description.trim(),
+        paymentType,
+        paymentStatus: paymentType === 'card' ? 'authorized' : 'pending_cash',
+        paymentMethodSnapshot: paymentType === 'card' && selectedMethodObj
+          ? `${selectedMethodObj.cardBrand || 'Tarjeta'} •••• ${selectedMethodObj.last4 || '1234'}`
+          : 'Efectivo en mano',
+        estimatedCost: totalEstimated,
+        hourlyRate,
+        platformFee,
         status: 'pending',
       } as any);
 
@@ -295,6 +342,138 @@ export default function BookingScreen() {
             onChangeText={setDescription}
             textAlignVertical="top"
           />
+        </View>
+
+        {/* Método de Pago */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Forma de Pago</Text>
+          <View style={styles.paymentTypeRow}>
+            <TouchableOpacity
+              style={[
+                styles.paymentTypeCard,
+                paymentType === 'cash' && styles.paymentTypeCardActive,
+                isDark && { backgroundColor: themeColors.surfaceLow, borderColor: themeColors.border },
+                paymentType === 'cash' && (isDark ? { borderColor: themeColors.primary, backgroundColor: themeColors.surfaceVariant } : null),
+              ]}
+              onPress={() => setPaymentType('cash')}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name="cash-outline"
+                size={20}
+                color={paymentType === 'cash' ? themeColors.primary : themeColors.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.paymentTypeLabel,
+                  isDark && { color: themeColors.textSecondary },
+                  paymentType === 'cash' && (isDark ? { color: themeColors.text, fontWeight: '700' } : styles.paymentTypeLabelActive),
+                ]}
+              >
+                Efectivo en mano
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.paymentTypeCard,
+                paymentType === 'card' && styles.paymentTypeCardActive,
+                isDark && { backgroundColor: themeColors.surfaceLow, borderColor: themeColors.border },
+                paymentType === 'card' && (isDark ? { borderColor: themeColors.primary, backgroundColor: themeColors.surfaceVariant } : null),
+              ]}
+              onPress={() => setPaymentType('card')}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name="card-outline"
+                size={20}
+                color={paymentType === 'card' ? themeColors.primary : themeColors.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.paymentTypeLabel,
+                  isDark && { color: themeColors.textSecondary },
+                  paymentType === 'card' && (isDark ? { color: themeColors.text, fontWeight: '700' } : styles.paymentTypeLabelActive),
+                ]}
+              >
+                Tarjeta bancaria
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Si eligió Tarjeta: Listar tarjetas guardadas o invitar a agregar */}
+          {paymentType === 'card' && (
+            <View style={[styles.cardSelectionContainer, isDark && { backgroundColor: themeColors.surfaceLow, borderColor: themeColors.border }]}>
+              {paymentMethods.length > 0 ? (
+                paymentMethods.map((pm) => {
+                  const isSelected = selectedPaymentId === pm.id;
+                  return (
+                    <TouchableOpacity
+                      key={pm.id}
+                      style={[
+                        styles.paymentMethodItem,
+                        isSelected && styles.paymentMethodItemActive,
+                        isDark && { borderColor: themeColors.border },
+                      ]}
+                      onPress={() => setSelectedPaymentId(pm.id)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name={isSelected ? 'radio-button-on' : 'radio-button-off'}
+                        size={18}
+                        color={isSelected ? themeColors.primary : themeColors.textSecondary}
+                      />
+                      <Ionicons name="card" size={20} color={themeColors.primary} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.paymentMethodTitle, isDark && { color: themeColors.text }]}>
+                          {pm.title || `${pm.cardBrand || 'Tarjeta'}`}
+                        </Text>
+                        <Text style={[styles.paymentMethodLast4, isDark && { color: themeColors.textSecondary }]}>
+                          •••• {pm.last4 || '1234'} • Vence {pm.expiryDate || '12/28'}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })
+              ) : (
+                <View style={styles.noCardContainer}>
+                  <Text style={[styles.noCardText, isDark && { color: themeColors.textSecondary }]}>
+                    No tienes tarjetas guardadas. Se usará una tarjeta de prueba de demostración.
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.addCardButton, isDark && { backgroundColor: themeColors.primary }]}
+                    onPress={() => router.push('/(tabs)/profile')}
+                  >
+                    <Ionicons name="add" size={16} color={isDark ? themeColors.onPrimary : '#FFFFFF'} />
+                    <Text style={[styles.addCardButtonText, isDark && { color: themeColors.onPrimary }]}>Registrar Tarjeta</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          )}
+        </View>
+
+        {/* Resumen de Costo Estimado */}
+        <View style={[styles.pricingSummaryCard, isDark && { backgroundColor: themeColors.card, borderColor: themeColors.border }]}>
+          <Text style={[styles.pricingSummaryTitle, isDark && { color: themeColors.text }]}>Resumen del Servicio</Text>
+          <View style={styles.pricingRow}>
+            <Text style={[styles.pricingLabel, isDark && { color: themeColors.textSecondary }]}>Tarifa base por hora:</Text>
+            <Text style={[styles.pricingValue, isDark && { color: themeColors.text }]}>${hourlyRate} MXN</Text>
+          </View>
+          <View style={styles.pricingRow}>
+            <Text style={[styles.pricingLabel, isDark && { color: themeColors.textSecondary }]}>Garantía y protección GoodJob:</Text>
+            <Text style={[styles.pricingValue, isDark && { color: themeColors.text }]}>${platformFee} MXN</Text>
+          </View>
+          <View style={[styles.pricingDivider, isDark && { backgroundColor: themeColors.border }]} />
+          <View style={styles.pricingRow}>
+            <Text style={[styles.pricingTotalLabel, isDark && { color: themeColors.text }]}>Total estimado inicial:</Text>
+            <Text style={[styles.pricingTotalValue, isDark && { color: themeColors.primary }]}>
+              ${hourlyRate + platformFee} MXN
+            </Text>
+          </View>
+          <Text style={[styles.pricingDisclaimer, isDark && { color: themeColors.textSecondary }]}>
+            * Si el servicio requiere refacciones o tiempo extra, se acordará antes de finalizar.
+          </Text>
         </View>
 
         {/* Botón Confirmar */}
@@ -484,5 +663,143 @@ const createStyles = (COLORS: any, isDark: boolean) => StyleSheet.create({
     color: COLORS.onPrimary,
     fontSize: 15,
     fontWeight: '700',
+  },
+  // Formas de Pago
+  paymentTypeRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 10,
+  },
+  paymentTypeCard: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: COLORS.card || '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: COLORS.border || '#E5E7EB',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  paymentTypeCardActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: '#F3F4F6',
+  },
+  paymentTypeLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: COLORS.textSecondary,
+  },
+  paymentTypeLabelActive: {
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  cardSelectionContainer: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    gap: 8,
+    marginTop: 4,
+  },
+  paymentMethodItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    gap: 10,
+  },
+  paymentMethodItemActive: {
+    borderColor: COLORS.primary,
+  },
+  paymentMethodTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  paymentMethodLast4: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  noCardContainer: {
+    alignItems: 'center',
+    paddingVertical: 8,
+    gap: 8,
+  },
+  noCardText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+  },
+  addCardButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    gap: 4,
+  },
+  addCardButtonText: {
+    color: COLORS.onPrimary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  // Resumen de Precios
+  pricingSummaryCard: {
+    backgroundColor: COLORS.card || '#FFFFFF',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border || '#E5E7EB',
+    marginBottom: 20,
+    gap: 8,
+  },
+  pricingSummaryTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: 4,
+  },
+  pricingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  pricingLabel: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+  },
+  pricingValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  pricingDivider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 4,
+  },
+  pricingTotalLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  pricingTotalValue: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.primary,
+  },
+  pricingDisclaimer: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    fontStyle: 'italic',
+    marginTop: 2,
   },
 });

@@ -632,6 +632,27 @@ export default function ActivityScreen() {
                           )
                         )}
 
+                        {/* Resumen de Pago y Tarifa Acordada */}
+                        {(!!b.estimatedCost || !!b.paymentMethodSnapshot) && (
+                          <View style={[styles.bookingPaymentRow, isDark && { backgroundColor: themeColors.surfaceLow, borderColor: themeColors.border }]}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <Ionicons
+                                name={b.paymentType === 'card' ? 'card-outline' : 'cash-outline'}
+                                size={16}
+                                color={themeColors.primary}
+                              />
+                              <Text style={[styles.bookingPaymentMethodText, isDark && { color: themeColors.text }]}>
+                                {b.paymentMethodSnapshot || (b.paymentType === 'card' ? 'Tarjeta' : 'Efectivo')}
+                              </Text>
+                            </View>
+                            {!!b.estimatedCost && (
+                              <Text style={[styles.bookingPaymentCostText, isDark && { color: themeColors.primary }]}>
+                                Est. ${b.estimatedCost} MXN
+                              </Text>
+                            )}
+                          </View>
+                        )}
+
                         {!!b.notes && (
                           <View style={[styles.bookingNotesContainer, isDark && { backgroundColor: themeColors.surfaceLow }]}>
                             <Text style={[styles.bookingNotesLabel, isDark && { color: themeColors.textSecondary }]}>Detalle del trabajo:</Text>
@@ -763,6 +784,27 @@ export default function ActivityScreen() {
                           </View>
                           {renderStatusBadge(booking.status || 'pending')}
                         </View>
+
+                        {/* Resumen de Pago y Tarifa Acordada */}
+                        {(!!booking.estimatedCost || !!booking.paymentMethodSnapshot) && (
+                          <View style={[styles.bookingPaymentRow, isDark && { backgroundColor: themeColors.surfaceLow, borderColor: themeColors.border }]}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <Ionicons
+                                name={booking.paymentType === 'card' ? 'card-outline' : 'cash-outline'}
+                                size={16}
+                                color={themeColors.primary}
+                              />
+                              <Text style={[styles.bookingPaymentMethodText, isDark && { color: themeColors.text }]}>
+                                {booking.paymentMethodSnapshot || (booking.paymentType === 'card' ? 'Tarjeta' : 'Efectivo')}
+                              </Text>
+                            </View>
+                            {!!booking.estimatedCost && (
+                              <Text style={[styles.bookingPaymentCostText, isDark && { color: themeColors.primary }]}>
+                                Total ${booking.estimatedCost} MXN
+                              </Text>
+                            )}
+                          </View>
+                        )}
 
                         {!!booking.notes && (
                           <View style={[styles.bookingNotesContainer, isDark && { backgroundColor: themeColors.surfaceLow }]}>
@@ -1631,6 +1673,28 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#374151',
     flex: 1,
+  },
+  bookingPaymentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F9FAFB',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  bookingPaymentMethodText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  bookingPaymentCostText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#111827',
   },
   mapsNavButton: {
     flexDirection: 'row',

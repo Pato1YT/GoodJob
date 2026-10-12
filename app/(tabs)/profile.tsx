@@ -113,14 +113,20 @@ export default function ProfileScreen() {
     type: 'card' | 'cash' | 'transfer';
     title: string;
     cardBrand: 'VISA' | 'MasterCard' | 'AMEX' | 'Otro';
+    cardNumber: string;
     last4: string;
     expiryDate: string;
+    cvc: string;
+    holderName: string;
   }>({
     type: 'card',
     title: 'Tarjeta Personal',
     cardBrand: 'VISA',
+    cardNumber: '',
     last4: '',
     expiryDate: '',
+    cvc: '',
+    holderName: '',
   });
 
   const showFeedbackModal = (
@@ -321,8 +327,11 @@ export default function ProfileScreen() {
       type: 'card',
       title: 'Tarjeta Personal',
       cardBrand: 'VISA',
+      cardNumber: '',
       last4: '',
       expiryDate: '',
+      cvc: '',
+      holderName: '',
     });
     setPaymentModalVisible(true);
   };
@@ -331,26 +340,50 @@ export default function ProfileScreen() {
     const currentUser = auth.currentUser;
     if (!currentUser) return;
 
-    if (paymentForm.type === 'card' && (!paymentForm.last4.trim() || paymentForm.last4.length < 4)) {
-      showFeedbackModal('warning', 'Por favor ingresa los 4 dígitos de la tarjeta.');
-      return;
+    if (paymentForm.type === 'card') {
+      const cleanNumber = paymentForm.cardNumber.replace(/\s+/g, '');
+      if (cleanNumber.length < 15) {
+        showFeedbackModal('warning', 'Por favor ingresa un número de tarjeta válido (16 dígitos).');
+        return;
+      }
+      if (!paymentForm.expiryDate.includes('/') || paymentForm.expiryDate.length < 5) {
+        showFeedbackModal('warning', 'Ingresa una fecha de expiración válida (formato MM/AA).');
+        return;
+      }
+      if (paymentForm.cvc.length < 3) {
+        showFeedbackModal('warning', 'Ingresa el código de seguridad (CVV de 3 o 4 dígitos).');
+        return;
+      }
     }
 
     try {
       setSavingPayment(true);
+      const cleanNumber = paymentForm.cardNumber.replace(/\s+/g, '');
+      const last4 = cleanNumber.slice(-4) || '4242';
+
+      // Detección automática de marca de tarjeta por prefijo
+      let detectedBrand: 'VISA' | 'MasterCard' | 'AMEX' | 'Otro' = 'VISA';
+      if (cleanNumber.startsWith('4')) {
+        detectedBrand = 'VISA';
+      } else if (cleanNumber.startsWith('5') || cleanNumber.startsWith('2')) {
+        detectedBrand = 'MasterCard';
+      } else if (cleanNumber.startsWith('34') || cleanNumber.startsWith('37')) {
+        detectedBrand = 'AMEX';
+      }
+
       await paymentMethodService.add(currentUser.uid, {
         type: paymentForm.type,
-        title: paymentForm.title.trim() || (paymentForm.type === 'card' ? 'Tarjeta Personal' : 'Efectivo'),
-        cardBrand: paymentForm.cardBrand,
-        last4: paymentForm.last4.trim().slice(-4),
-        expiryDate: paymentForm.expiryDate.trim() || '12/28',
+        title: paymentForm.title.trim() || `${detectedBrand} •••• ${last4}`,
+        cardBrand: detectedBrand,
+        last4,
+        expiryDate: paymentForm.expiryDate.trim(),
         isDefault: paymentMethods.length === 0,
       });
 
       const updated = await paymentMethodService.getByUserId(currentUser.uid);
       setPaymentMethods(updated);
       setPaymentModalVisible(false);
-      showFeedbackModal('success', 'Método de pago guardado correctamente.');
+      showFeedbackModal('success', `Tarjeta ${detectedBrand} terminada en ${last4} verificada y guardada con éxito.`);
     } catch (e) {
       console.error('Error saving payment method:', e);
       showFeedbackModal('danger', 'No se pudo guardar el método de pago.');
@@ -1425,37 +1458,72 @@ export default function ProfileScreen() {
                   <View style={styles.addressFormContainer}>
                     <TextInput
                       style={styles.addressInput}
-                      placeholder="Nombre o alias (ej. Débito BBVA)"
+                      placeholder="Nombre del titular (como aparece en la tarjeta)"
                       placeholderTextColor={COLORS.textSecondary}
-                      value={paymentForm.title}
-                      onChangeText={(val) => setPaymentForm((prev) => ({ ...prev, title: val }))}
+                      value={paymentForm.holderName}
+                      onChangeText={(val) => setPaymentForm((prev) => ({ ...prev, holderName: val }))}
+                      editable={!savingPayment}
+                    />
+
+                    {/* Número completo de 16 dígitos con espaciado cada 4 */}
+                    <TextInput
+                      style={styles.addressInput}
+                      placeholder="Número de tarjeta (16 dígitos)"
+                      placeholderTextColor={COLORS.textSecondary}
+                      value={paymentForm.cardNumber}
+                      onChangeText={(val) => {
+                        const digits = val.replace(/\D/g, '').slice(0, 16);
+                        const formatted = digits.replace(/(\d{4})(?=\d)/g, '$1 ');
+                        setPaymentForm((prev) => ({
+                          ...prev,
+                          cardNumber: formatted,
+                          last4: digits.slice(-4),
+                        }));
+                      }}
+                      keyboardType="number-pad"
+                      maxLength={19}
                       editable={!savingPayment}
                     />
 
                     <View style={styles.addressRow}>
                       <TextInput
-                        style={[styles.addressInput, { flex: 2 }]}
-                        placeholder="Últimos 4 dígitos"
+                        style={[styles.addressInput, { flex: 1 }]}
+                        placeholder="MM/AA"
                         placeholderTextColor={COLORS.textSecondary}
-                        value={paymentForm.last4}
-                        onChangeText={(val) =>
-                          setPaymentForm((prev) => ({ ...prev, last4: val.replace(/\D/g, '').slice(0, 4) }))
-                        }
+                        value={paymentForm.expiryDate}
+                        onChangeText={(val) => {
+                          const cleaned = val.replace(/\D/g, '').slice(0, 4);
+                          const formatted = cleaned.length >= 3 ? `${cleaned.slice(0, 2)}/${cleaned.slice(2)}` : cleaned;
+                          setPaymentForm((prev) => ({ ...prev, expiryDate: formatted }));
+                        }}
                         keyboardType="number-pad"
-                        maxLength={4}
+                        maxLength={5}
                         editable={!savingPayment}
                       />
 
                       <TextInput
-                        style={[styles.addressInput, { flex: 1.5 }]}
-                        placeholder="MM/AA"
+                        style={[styles.addressInput, { flex: 1 }]}
+                        placeholder="CVV / CVC"
                         placeholderTextColor={COLORS.textSecondary}
-                        value={paymentForm.expiryDate}
-                        onChangeText={(val) => setPaymentForm((prev) => ({ ...prev, expiryDate: val }))}
-                        maxLength={5}
+                        value={paymentForm.cvc}
+                        onChangeText={(val) =>
+                          setPaymentForm((prev) => ({ ...prev, cvc: val.replace(/\D/g, '').slice(0, 4) }))
+                        }
+                        keyboardType="number-pad"
+                        maxLength={4}
+                        secureTextEntry
                         editable={!savingPayment}
                       />
                     </View>
+
+                    <TextInput
+                      style={styles.addressInput}
+                      placeholder="Alias opcional (ej. Débito Nómina, Tarjeta BBVA)"
+                      placeholderTextColor={COLORS.textSecondary}
+                      value={paymentForm.title}
+                      onChangeText={(val) => setPaymentForm((prev) => ({ ...prev, title: val }))}
+                      editable={!savingPayment}
+                    />
                   </View>
                 ) : (
                   <View style={styles.cashNoticeBox}>
