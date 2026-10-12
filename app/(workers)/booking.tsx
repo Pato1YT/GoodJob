@@ -16,7 +16,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { doc, updateDoc } from 'firebase/firestore';
-import { bookingService, chatService, workerService, userService } from '../../src/data/firestore';
+import { bookingService, chatService, workerService, userService, addressService } from '../../src/data/firestore';
 import { CustomModal, ModalType } from '../../src/components/CustomModal';
 import { auth, db } from '../../src/config/firebase';
 import { getWorkerPhoto } from '../../src/utils/avatarUtils';
@@ -106,14 +106,17 @@ export default function BookingScreen() {
     try {
       setLoading(true);
 
-      // Obtener datos del cliente y del trabajador
-      const [workerData, clientData] = await Promise.all([
+      // Obtener datos del cliente, trabajador y dirección registrada
+      const [workerData, clientData, clientAddress] = await Promise.all([
         workerService.getById(workerId),
         userService.getById(currentUser.uid),
+        addressService.getDefaultByUserId(currentUser.uid),
       ]);
 
       const w = workerData as any;
       const c = clientData as any;
+      const addr = clientAddress as any;
+
       const resolvedWorkerName = `${w?.firstName || ''} ${w?.lastName || ''}`.trim() || workerData?.userNameSnapshot || workerName || 'Profesional';
       const resolvedWorkerCategory = w?.title || w?.category || (w?.bio ? w.bio.split('.')[0] : '') || workerCategory || 'Especialista en servicios';
       const resolvedWorkerPhoto = getWorkerPhoto({ id: workerId, ...w, ...workerData });
@@ -122,7 +125,14 @@ export default function BookingScreen() {
       const resolvedClientPhone = c?.phone || '';
       const resolvedClientPhoto = c?.photoUrl || currentUser.photoURL || '';
 
-      // Guardar reserva en Firestore con datos completos de ambas partes
+      const baseAddress = addr
+        ? `${addr.street} ${addr.number || ''}${addr.neighborhood ? `, ${addr.neighborhood}` : ''}${addr.city ? `, ${addr.city}` : ''}`.trim()
+        : '';
+      const formattedLocation = addr?.references
+        ? `${baseAddress} (Ref: ${addr.references})`
+        : baseAddress;
+
+      // Guardar reserva en Firestore con datos completos de ambas partes incluyendo GPS
       await bookingService.create({
         userId: currentUser.uid,
         workerId,
@@ -132,6 +142,9 @@ export default function BookingScreen() {
         clientNameSnapshot: resolvedClientName,
         clientPhoneSnapshot: resolvedClientPhone,
         clientPhotoSnapshot: resolvedClientPhoto,
+        location: formattedLocation,
+        latitude: addr?.lat || 0,
+        longitude: addr?.lng || 0,
         date: selectedDate,
         timeSlot: selectedTime,
         notes: description.trim(),

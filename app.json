@@ -11,6 +11,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.goodjob.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -30,7 +31,24 @@
           "asyncRoutes": false
         }
       ],
-      "expo-font"
-    ]
+      "expo-font",
+      "expo-notifications",
+      "expo-image-picker",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "GoodJob necesita acceder a tu ubicación para que los profesionales puedan llegar a tu domicilio."
+        }
+      ]
+    ],
+    "extra": {
+      "router": {
+        "origin": false,
+        "asyncRoutes": false
+      },
+      "eas": {
+        "projectId": "b8b277d3-8aab-4713-a9f3-ef6a068d7648"
+      }
+    }
   }
 }
