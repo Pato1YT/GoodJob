@@ -18,9 +18,12 @@ import {
   colors,
   spacing,
 } from '../../src/components/common';
+import { useThemeStore } from '../../src/utils/themeStore';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
+  const isDark = useThemeStore((s) => s.isDark);
+  const themeColors = useThemeStore((s) => s.colors);
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -88,12 +91,12 @@ export default function ForgotPasswordScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
+      style={[styles.container, isDark && { backgroundColor: themeColors.background }]}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <Text style={styles.title}>Recuperar Contraseña</Text>
-          <Text style={styles.subtitle}>
+          <Text style={[styles.title, isDark && { color: themeColors.text }]}>Recuperar Contraseña</Text>
+          <Text style={[styles.subtitle, isDark && { color: themeColors.textSecondary }]}>
             Ingresa tu email y te enviaremos un enlace para resetear tu contraseña
           </Text>
         </View>

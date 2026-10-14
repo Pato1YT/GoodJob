@@ -1,6 +1,7 @@
 /**
  * GoodJob - Login Screen
  * Pantalla de inicio de sesión con el nuevo diseño UI y lógica integrada
+ * 
  */
 
 import React, { useState } from 'react';
@@ -14,6 +15,7 @@ import {
   Platform,
   StyleSheet,
   ActivityIndicator,
+  StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -21,8 +23,10 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../../src/utils/useAuth';
 import { CustomModal, ModalType } from '../../src/components/CustomModal';
 import { getSpanishAuthErrorMessage } from '../../src/utils/firebaseErrors';
+import { tiene2FAActivado, enviarCodigoOTP } from '../../src/utils/emailOtp';
+import { setPendingUid } from '../../src/utils/pendingAuthStore';
+import { useThemeStore } from '../../src/utils/themeStore';
 
-// Helper para validar formato de correo
 const validateEmail = (email: string): boolean => {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return re.test(email);
@@ -31,12 +35,13 @@ const validateEmail = (email: string): boolean => {
 export default function LoginScreen() {
   const router = useRouter();
   const { signIn, loading } = useAuth();
+  const isDark = useThemeStore((s) => s.isDark);
+  const themeColors = useThemeStore((s) => s.colors);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Estados para el Modal Reutilizable
   const [modalVisible, setModalVisible] = useState(false);
   const [modalConfig, setModalConfig] = useState<{ type: ModalType; message: string }>({
     type: 'danger',
@@ -44,44 +49,45 @@ export default function LoginScreen() {
   });
 
   const showErrorModal = (message: string) => {
-    setModalConfig({
-      type: 'danger',
-      message,
-    });
+    setModalConfig({ type: 'danger', message });
     setModalVisible(true);
   };
 
   const handleLogin = async () => {
     try {
-      // Validaciones de formulario
       if (!email.trim()) {
         showErrorModal('Por favor ingresa tu correo');
         return;
       }
-
       if (!validateEmail(email)) {
         showErrorModal('Por favor ingresa un correo válido');
         return;
       }
-
       if (!password) {
         showErrorModal('Por favor ingresa tu contraseña');
         return;
       }
 
-      // Llamada al método de autenticación original
-      await signIn(email, password);
+      const userCredential = await signIn(email, password);
+      const tiene2FA = await tiene2FAActivado(userCredential.user.uid);
+
+      if (tiene2FA) {
+        await enviarCodigoOTP(userCredential.user.uid, email);
+        setPendingUid(userCredential.user.uid);
+        router.push('/(auth)/two_step_verification');
+      } else {
+        router.replace('/(tabs)');
+      }
     } catch (err: any) {
-      // Traducir código de error o mensaje devuelto
       const rawCode = err?.code || (err instanceof Error ? err.message : '');
       const friendlyMessage = getSpanishAuthErrorMessage(rawCode);
-
       showErrorModal(friendlyMessage);
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, isDark && { backgroundColor: themeColors.background }]}>
+      <StatusBar barStyle={themeColors.statusBar} backgroundColor={themeColors.background} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flexOne}
@@ -91,40 +97,31 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Header Superior con Botón Atrás y Título Centrado */}
           <View style={styles.header}>
             <TouchableOpacity
               style={styles.backButton}
               onPress={() => router.back()}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <MaterialIcons name="arrow-back" size={24} color="#000000" />
+              <MaterialIcons name="arrow-back" size={24} color={themeColors.primary} />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Inicio de Sesión</Text>
+            <Text style={[styles.headerTitle, isDark && { color: themeColors.text }]}>Inicio de Sesión</Text>
             <View style={styles.headerPlaceholder} />
           </View>
 
           <View style={styles.content}>
-            {/* Título Principal y Subtítulo */}
             <View style={styles.titleContainer}>
-              <Text style={styles.brandTitle}>Good Job</Text>
-              <Text style={styles.subtitle}>Inicia sesión para continuar</Text>
+              <Text style={[styles.brandTitle, isDark && { color: themeColors.text }]}>Good Job</Text>
+              <Text style={[styles.subtitle, isDark && { color: themeColors.textSecondary }]}>Inicia sesión para continuar</Text>
             </View>
 
-            {/* Formulario de Entrada */}
             <View style={styles.form}>
-              {/* Input de Correo Electrónico */}
-              <View style={styles.inputContainer}>
-                <MaterialIcons
-                  name="mail-outline"
-                  size={20}
-                  color="#666666"
-                  style={styles.inputIcon}
-                />
+              <View style={[styles.inputContainer, isDark && { backgroundColor: themeColors.inputBg, borderColor: themeColors.border, borderWidth: 1 }]}>
+                <MaterialIcons name="mail-outline" size={20} color={themeColors.textSecondary} style={styles.inputIcon} />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, isDark && { color: themeColors.text }]}
                   placeholder="Correo electrónico"
-                  placeholderTextColor="#757575"
+                  placeholderTextColor={themeColors.textSecondary}
                   value={email}
                   onChangeText={setEmail}
                   keyboardType="email-address"
@@ -133,49 +130,37 @@ export default function LoginScreen() {
                 />
               </View>
 
-              {/* Input de Contraseña con Toggle de Visibilidad */}
-              <View style={styles.inputContainer}>
-                <MaterialIcons
-                  name="lock-outline"
-                  size={20}
-                  color="#666666"
-                  style={styles.inputIcon}
-                />
+              <View style={[styles.inputContainer, isDark && { backgroundColor: themeColors.inputBg, borderColor: themeColors.border, borderWidth: 1 }]}>
+                <MaterialIcons name="lock-outline" size={20} color={themeColors.textSecondary} style={styles.inputIcon} />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, isDark && { color: themeColors.text }]}
                   placeholder="Contraseña"
-                  placeholderTextColor="#757575"
+                  placeholderTextColor={themeColors.textSecondary}
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
                   editable={!loading}
                 />
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  style={styles.eyeIcon}
-                >
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
                   <MaterialIcons
                     name={showPassword ? 'visibility' : 'visibility-off'}
                     size={20}
-                    color="#666666"
+                    color={themeColors.textSecondary}
                   />
                 </TouchableOpacity>
               </View>
 
-              {/* Enlace Olvidaste tu Contraseña */}
               <TouchableOpacity
                 style={styles.forgotPasswordContainer}
                 onPress={() => router.push('/(auth)/forgot-password')}
               >
-                <Text style={styles.forgotPasswordText}>
-                  ¿Olvidaste tu contraseña?
-                </Text>
+                <Text style={[styles.forgotPasswordText, isDark && { color: themeColors.text }]}>¿Olvidaste tu contraseña?</Text>
               </TouchableOpacity>
 
-              {/* Botón Iniciar Sesión */}
               <TouchableOpacity
                 style={[
                   styles.loginButton,
+                  isDark && { backgroundColor: themeColors.primary },
                   (loading || !email || !password) && styles.loginButtonDisabled,
                 ]}
                 onPress={handleLogin}
@@ -183,28 +168,26 @@ export default function LoginScreen() {
                 disabled={loading || !email || !password}
               >
                 {loading ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <ActivityIndicator size="small" color={themeColors.onPrimary} />
                 ) : (
                   <>
-                    <MaterialIcons name="check" size={20} color="#FFFFFF" />
-                    <Text style={styles.loginButtonText}>Iniciar Sesión</Text>
+                    <MaterialIcons name="check" size={20} color={themeColors.onPrimary} />
+                    <Text style={[styles.loginButtonText, isDark && { color: themeColors.onPrimary }]}>Iniciar Sesión</Text>
                   </>
                 )}
               </TouchableOpacity>
             </View>
 
-            {/* Enlace para ir al Registro */}
             <View style={styles.signupContainer}>
-              <Text style={styles.signupText}>¿No tienes cuenta? </Text>
+              <Text style={[styles.signupText, isDark && { color: themeColors.textSecondary }]}>¿No tienes cuenta? </Text>
               <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
-                <Text style={styles.signupLink}>Regístrate aquí</Text>
+                <Text style={[styles.signupLink, isDark && { color: themeColors.primary }]}>Regístrate aquí</Text>
               </TouchableOpacity>
             </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Modal Reutilizable de Alertas */}
       <CustomModal
         visible={modalVisible}
         type={modalConfig.type}
@@ -216,16 +199,9 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  flexOne: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  flexOne: { flex: 1 },
+  scrollContent: { flexGrow: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -233,45 +209,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: 56,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 20,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#000000',
-  },
-  headerPlaceholder: {
-    width: 40,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-    justifyContent: 'center',
-    paddingBottom: 40,
-  },
-  titleContainer: {
-    alignItems: 'center',
-    marginBottom: 28,
-  },
-  brandTitle: {
-    fontSize: 38,
-    fontWeight: '800',
-    color: '#000000',
-    marginBottom: 6,
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 15,
-    color: '#666666',
-  },
-  form: {
-    gap: 16,
-  },
+  backButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center', borderRadius: 20 },
+  headerTitle: { fontSize: 20, fontWeight: '700', color: '#000000' },
+  headerPlaceholder: { width: 40 },
+  content: { flex: 1, paddingHorizontal: 24, justifyContent: 'center', paddingBottom: 40 },
+  titleContainer: { alignItems: 'center', marginBottom: 28 },
+  brandTitle: { fontSize: 36, fontWeight: '800', color: '#000000', marginBottom: 6, letterSpacing: -0.5 },
+  subtitle: { fontSize: 15, color: '#666666' },
+  form: { gap: 16 },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -280,27 +225,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: 56,
   },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    fontSize: 15,
-    color: '#000000',
-  },
-  eyeIcon: {
-    padding: 4,
-  },
-  forgotPasswordContainer: {
-    alignSelf: 'flex-end',
-    marginTop: -4,
-    marginBottom: 8,
-  },
-  forgotPasswordText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#000000',
-  },
+  inputIcon: { marginRight: 12 },
+  input: { flex: 1, fontSize: 15, color: '#000000' },
+  eyeIcon: { padding: 4 },
+  forgotPasswordContainer: { alignSelf: 'flex-end', marginTop: -4, marginBottom: 8 },
+  forgotPasswordText: { fontSize: 14, fontWeight: '600', color: '#000000' },
   loginButton: {
     backgroundColor: '#000000',
     borderRadius: 12,
@@ -311,27 +240,9 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 4,
   },
-  loginButtonDisabled: {
-    opacity: 0.6,
-  },
-  loginButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  signupContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 28,
-  },
-  signupText: {
-    fontSize: 15,
-    color: '#666666',
-  },
-  signupLink: {
-    fontSize: 15,
-    color: '#000000',
-    fontWeight: '700',
-  },
+  loginButtonDisabled: { opacity: 0.6 },
+  loginButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  signupContainer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 28 },
+  signupText: { fontSize: 15, color: '#666666' },
+  signupLink: { fontSize: 15, color: '#000000', fontWeight: '700' },
 });

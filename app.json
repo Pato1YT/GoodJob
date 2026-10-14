@@ -2,14 +2,16 @@
   "expo": {
     "name": "goodjob-expo",
     "slug": "goodjob-expo",
+    "scheme": "goodjob-expo",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true
     },
     "android": {
+      "package": "com.goodjob.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -28,7 +30,32 @@
           "origin": false,
           "asyncRoutes": false
         }
+      ],
+      "expo-font",
+      "expo-notifications",
+      "expo-image-picker",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "GoodJob necesita acceder a tu ubicación para que los profesionales puedan llegar a tu domicilio."
+        }
+      ],
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.goodjob.app",
+          "enableGooglePay": true
+        }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {
+        "origin": false,
+        "asyncRoutes": false
+      },
+      "eas": {
+        "projectId": "b8b277d3-8aab-4713-a9f3-ef6a068d7648"
+      }
+    }
   }
 }
