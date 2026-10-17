@@ -1,20 +1,22 @@
-# GOOBJOB 
+# GOODJOB 
 <p align="center">
-  <img src="assets/goobob-logo-borde-claro.png" alt="goobjob-logo" width="140">
+  <img src="assets/goobjob-logo.png" alt="goobjob_logo" width="140">
 </p>
  
- ![React Native](https://img.shields.io/badge/React_Native-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![React Native](https://img.shields.io/badge/React_Native-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
 ![Expo](https://img.shields.io/badge/Expo-000020?style=for-the-badge&logo=expo&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
 ![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)
 ![Firestore](https://img.shields.io/badge/Firestore-FF9100?style=for-the-badge&logo=firebase&logoColor=white)
+![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white)
+![Asistente IA](https://img.shields.io/badge/Asistente_IA-10A37F?style=for-the-badge&logo=probot&logoColor=white)
+![EmailJS](https://img.shields.io/badge/EmailJS-FF7F50?style=for-the-badge&logo=maildotru&logoColor=white)
 
+**Goodjob** es una aplicación móvil que conecta a las personas con profesionales de oficios (plomeros, electricistas, carpinteros, pintores, técnicos y más) de forma **rápida, segura y confiable**.
 
-**Goobjob** es una aplicación móvil que conecta a las personas con profesionales de oficios (plomeros, electricistas, carpinteros, pintores, técnicos y más) de forma **rápida, segura y confiable**.
+GoodJob permite solicitar un servicio, ver quién está disponible cerca de ti y contratar al profesional adecuado en pocos pasos, sin depender de recomendaciones informales ni de búsquedas improvisadas.
 
-GoobJob permite solicitar un servicio, ver quién está disponible cerca de ti y contratar al profesional adecuado en pocos pasos, sin depender de recomendaciones informales ni de búsquedas improvisadas.
-
-## ¿Por qué GoobJob?
+## ¿Por qué GoodJob?
 
 Encontrar a alguien de confianza para un trabajo en casa suele ser complicado: no sabes a quién llamar, cuánto cobrará ni si hará bien el trabajo. goobjob resuelve este problema ofreciendo:
 
@@ -44,7 +46,7 @@ Encontrar a alguien de confianza para un trabajo en casa suele ser complicado: n
 
 ## 📖 Descripción
 
-**GOOBOB** es una aplicación multiplataforma (**iOS, Android y Web**) que conecta a quienes necesitan un servicio con profesionales de oficios verificados, de forma segura, rápida y transparente.
+**GOODJOB** es una aplicación multiplataforma (**iOS, Android y Web**) que conecta a quienes necesitan un servicio con profesionales de oficios verificados, de forma segura, rápida y transparente.
 
 | Función | Descripción |
 |---------|-------------|
@@ -308,7 +310,7 @@ Consulta `firestore_schema_basejob.md` para ver los detalles completos.
 
 ## 👥 Equipo
 
-Desarrollado por el equipo de **GOOBJOB**.
+Desarrollado por el equipo de **GOODJOB**.
 
 <p align="center">
   <sub>Última actualización: octubre 2026</sub>
