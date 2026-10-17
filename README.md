@@ -1,40 +1,76 @@
-# 🔧 GoodJob - Expo
+# GOOBJOB 
+<p align="center">
+  <img src="assets/goobob-logo-borde-claro.png" alt="goobjob-logo" width="140">
+</p>
+ 
+ ![React Native](https://img.shields.io/badge/React_Native-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![Expo](https://img.shields.io/badge/Expo-000020?style=for-the-badge&logo=expo&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
+![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)
+![Firestore](https://img.shields.io/badge/Firestore-FF9100?style=for-the-badge&logo=firebase&logoColor=white)
 
-Plataforma móvil para conectar empleadores y trabajadores de servicios domésticos y técnicos.
 
-**Stack:** React Native (Expo) • TypeScript • Firebase • Firestore
+**Goobjob** es una aplicación móvil que conecta a las personas con profesionales de oficios (plomeros, electricistas, carpinteros, pintores, técnicos y más) de forma **rápida, segura y confiable**.
 
+GoobJob permite solicitar un servicio, ver quién está disponible cerca de ti y contratar al profesional adecuado en pocos pasos, sin depender de recomendaciones informales ni de búsquedas improvisadas.
+
+## ¿Por qué GoobJob?
+
+Encontrar a alguien de confianza para un trabajo en casa suele ser complicado: no sabes a quién llamar, cuánto cobrará ni si hará bien el trabajo. goobjob resuelve este problema ofreciendo:
+
+- **Seguridad:** profesionales verificados para que contrates con tranquilidad.
+- **Confianza:** calificaciones y reseñas de otros usuarios.
+- **Rapidez:** solicita un servicio y recibe respuesta desde tu celular.
+- **Transparencia:** conoce al profesional y las condiciones del servicio antes de contratar.
+- **Oportunidades para los oficios:** los trabajadores independientes llegan a más clientes y generan ingresos de forma más estable.
 ---
 
 ## 📋 Tabla de contenidos
 
-- [Descripción](#descripción)
-- [Stack Tecnológico](#stack-tecnológico)
-- [Requisitos](#requisitos)
-- [Instalación](#instalación)
-- [Variables de Entorno](#variables-de-entorno)
-- [Estructura de Carpetas](#estructura-de-carpetas)
-- [Comandos](#comandos)
-- [Firestore Schema](#firestore-schema)
-
+- [Introducción](#-introducción)
+- [Características](#-características)
+- [Cómo funciona](#-cómo-funciona)
+- [Stack tecnológico](#-stack-tecnológico)
+- [Requisitos](#-requisitos)
+- [Instalación](#-instalación)
+- [Variables de entorno](#-variables-de-entorno)
+- [Estructura de carpetas](#-estructura-de-carpetas)
+- [Comandos](#-comandos)
+- [Firestore Schema](#-firestore-schema)
+- [Roadmap](#-roadmap)
+- [Enlaces útiles](#-enlaces-útiles)
+- [Equipo](#-equipo)
 ---
 
 ## 📖 Descripción
 
-**GoodJob** es una aplicación multiplataforma (iOS, Android, Web) que facilita:
+**GOOBOB** es una aplicación multiplataforma (**iOS, Android y Web**) que conecta a quienes necesitan un servicio con profesionales de oficios verificados, de forma segura, rápida y transparente.
 
-- 👨‍💼 **Empleadores:** Encontrar trabajadores verificados para servicios domésticos y técnicos
-- 🔧 **Trabajadores:** Promocionar sus servicios y aceptar trabajos
-- ⭐ **Reseñas:** Sistema de calificación para garantizar calidad
-- 💬 **Chat:** Comunicación directa entre empleador y trabajador
-- 🤖 **IA:** Asistente para ayudar a identificar el servicio necesario
+| Función | Descripción |
+|---------|-------------|
+| 👨‍💼 **Empleadores** | Encuentra trabajadores verificados para servicios domésticos y técnicos. |
+| 🔧 **Trabajadores** | Promociona tus servicios, muestra tu trabajo y acepta nuevas solicitudes. |
+| ⭐ **Reseñas** | Sistema de calificaciones que garantiza la calidad del servicio y genera confianza. |
+| 💬 **Chat** | Comunicación directa y en tiempo real entre empleador y trabajador. |
+| 🤖 **Asistente de IA** | Te ayuda a identificar el servicio que necesitas y a encontrar al profesional adecuado. |
+| 🔐 **Verificación multifactor (MFA)** | Capa adicional de seguridad en el acceso a las cuentas para proteger a usuarios y trabajadores. |
+| 📍 **Ubicación en tiempo real** | Consulta la ubicación del profesional durante el servicio y sigue su llegada en el mapa. |
+---
+
+## 🧭 Cómo funciona
+
+1. **Describe lo que necesitas** o deja que el asistente de IA te ayude a identificar el servicio.
+2. **Elige a un profesional** según su perfil, disponibilidad y reseñas.
+3. **Contrata y coordina** los detalles por chat.
+4. **Sigue su llegada** en el mapa en tiempo real.
+5. **Califica el servicio** para ayudar a la comunidad.
 
 ---
 
-## 🛠️ Stack Tecnológico
+## 🧰 Stack tecnológico
 
 | Tecnología | Versión | Propósito |
-|-----------|---------|----------|
+|-----------|---------|-----------|
 | **Expo** | 57+ | Framework para React Native |
 | **React Native** | Latest | Framework móvil |
 | **TypeScript** | Latest | Tipado estático |
@@ -42,21 +78,25 @@ Plataforma móvil para conectar empleadores y trabajadores de servicios domésti
 | **Firestore** | Latest | Base de datos NoSQL |
 | **Zustand** | Latest | Gestión de estado (opcional) |
 | **Expo Router** | Latest | Navegación |
-
+| **EmailJS** | Latest | Envío de correos (verificación, notificaciones) |
+| **OpenAI API** | Latest | Asistente de IA para identificar servicios |
 ---
 
 ## ✅ Requisitos
 
 - **Node.js** >= 18.0.0
 - **npm** >= 9.0.0 (o yarn/pnpm)
+- **Cuenta de Firebase** → [console.firebase.google.com](https://console.firebase.google.com)
+- **Cuenta de EmailJS** → [emailjs.com](https://www.emailjs.com)
 - **Expo CLI**: `npm install -g expo-cli`
-- **Cuenta de Firebase** (https://console.firebase.google.com)
+- **Cuenta de OpenAI** (API key) → [platform.openai.com](https://platform.openai.com)
+
 
 **Verificar instalación:**
 ```bash
 node --version
 npm --version
-expo --version
+npx expo --version
 ```
 
 ---
@@ -96,6 +136,11 @@ EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=tu_storage_bucket
 EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=tu_messaging_id
 EXPO_PUBLIC_FIREBASE_APP_ID=tu_app_id
 ```
+### 5. Ejecutar la app
+
+```bash
+npx expo start
+```
 
 ---
 
@@ -112,13 +157,26 @@ EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=
 EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
 EXPO_PUBLIC_FIREBASE_APP_ID=
 
-# Google Maps (opcional)
+# EmailJS
+EXPO_PUBLIC_EMAILJS_SERVICE_ID=
+EXPO_PUBLIC_EMAILJS_TEMPLATE_ID=
+EXPO_PUBLIC_EMAILJS_PUBLIC_KEY=
+
+# OpenAI (solo en el servidor, NO usar prefijo EXPO_PUBLIC_)
+OPENAI_API_KEY=
+
+# Google Maps (opcional, para ubicación en tiempo real)
 EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=
 
 # API URLs
 EXPO_PUBLIC_API_URL=http://localhost:3000
 EXPO_PUBLIC_API_TIMEOUT=30000
 ```
+
+> ⚠️ Las variables con prefijo `EXPO_PUBLIC_` se incluyen en el código de la app y son visibles para los usuarios. Protege tus datos con **Firebase Security Rules** y restringe tus API keys.
+
+> 🔒 La clave de OpenAI se guarda únicamente en el servidor (por ejemplo, Firebase Cloud Functions), nunca en la app.
+
 
 ---
 
@@ -162,33 +220,18 @@ goodjob-expo/
 
 ---
 
-## ▶️ Comandos
+## 💻 Comandos
 
-```bash
-# Ejecutar en modo desarrollo (Web)
-npm run web
-
-# Ejecutar en Android
-npm run android
-
-# Ejecutar en iOS
-npm run ios
-
-# Limpiar caché
-npm run clean
-
-# Instalar dependencias
-npm install
-
-# Actualizar dependencias
-npm update
-
-# Tests (cuando estén configurados)
-npm test
-
-# Build para producción
-npm run build
-```
+| Comando | Descripción |
+|---------|-------------|
+| `npm run web` | Ejecutar en modo desarrollo (Web) |
+| `npm run android` | Ejecutar en Android |
+| `npm run ios` | Ejecutar en iOS |
+| `npm run clean` | Limpiar caché |
+| `npm install` | Instalar dependencias |
+| `npm update` | Actualizar dependencias |
+| `npm test` | Ejecutar tests (cuando estén configurados) |
+| `npm run build` | Build para producción |
 
 ---
 
@@ -196,63 +239,50 @@ npm run build
 
 El proyecto usa **21 colecciones** en Firestore:
 
-**Usuarios y Perfiles:**
-- `users` - Cuentas de usuarios
-- `workers` - Perfiles de trabajadores
-- `addresses` - Direcciones
+| Categoría | Colección | Descripción |
+|-----------|-----------|-------------|
+| 👤 **Usuarios y perfiles** | `users` | Cuentas de usuarios |
+| | `workers` | Perfiles de trabajadores |
+| | `addresses` | Direcciones |
+| 🔧 **Servicios** | `categories` | Categorías de servicios |
+| | `workerCategories` | Relación trabajador-categoría |
+| | `availability` | Horarios disponibles |
+| | `workEvidence` | Evidencia de trabajo |
+| 📅 **Reservas** | `bookings` | Reservas de servicios |
+| | `serviceRequests` | Solicitudes de servicio |
+| 💬 **Mensajería** | `chats` | Conversaciones |
+| | `chatMessages` | Mensajes (subcolección) |
+| 🤖 **IA** | `aiConversations` | Conversaciones con IA |
+| | `aiMessages` | Mensajes de IA (subcolección) |
+| | `aiDiagnostics` | Diagnósticos |
+| | `aiRecommendations` | Recomendaciones |
+| 📦 **Otros** | `reviews` | Reseñas |
+| | `favorites` | Favoritos |
+| | `notifications` | Notificaciones |
+| | `payments` | Pagos |
+| | `paymentMethods` | Métodos de pago |
+| | `reports` | Reportes |
 
-**Servicios:**
-- `categories` - Categorías de servicios
-- `workerCategories` - Relación trabajador-categoría
-- `availability` - Horarios disponibles
-- `workEvidence` - Evidencia de trabajo
-
-**Reservas:**
-- `bookings` - Reservas de servicios
-- `serviceRequests` - Solicitudes de servicio
-
-**Mensajería:**
-- `chats` - Conversaciones
-- `chatMessages` - Mensajes (subcolección)
-
-**IA:**
-- `aiConversations` - Conversaciones con IA
-- `aiMessages` - Mensajes de IA (subcolección)
-- `aiDiagnostics` - Diagnósticos
-- `aiRecommendations` - Recomendaciones
-
-**Otros:**
-- `reviews` - Reseñas
-- `favorites` - Favoritos
-- `notifications` - Notificaciones
-- `payments` - Pagos
-- `paymentMethods` - Métodos de pago
-- `reports` - Reportes
-
-Ver `firestore_schema_basejob.md` para detalles completos.
+Consulta `firestore_schema_basejob.md` para ver los detalles completos.
 
 ---
 
-## 🚀 Primeros Pasos
+## 🚀 Roadmap
 
-1. **Configurar Firebase** (credenciales en `.env.local`)
-2. **Crear colecciones** en Firestore (manualmente o con scripts)
-3. **Implementar autenticación** (LoginScreen)
-4. **Crear HomeScreen** (listado de trabajadores)
-5. **Agregar navegación** (expo-router)
-
----
-
-## 🔗 Enlaces Útiles
-
-- [Documentación de Expo](https://docs.expo.dev)
-- [Firebase JS SDK](https://firebase.google.com/docs/web/setup)
-- [Firestore Database](https://firebase.google.com/docs/firestore)
-- [TypeScript Handbook](https://www.typescriptlang.org/docs)
-- [React Native Docs](https://reactnative.dev)
+- [ ] Configurar Firebase (credenciales en `.env.local`)
+- [ ] Crear las colecciones en Firestore (manualmente o con scripts)
+- [ ] Implementar autenticación (`LoginScreen`)
+- [ ] Verificación multifactor (MFA) con Firebase Authentication
+- [ ] Crear `HomeScreen` (listado de trabajadores)
+- [ ] Agregar navegación con `expo-router`
+- [ ] Chat entre empleador y trabajador
+- [ ] Asistente de IA con OpenAI (a través de un backend seguro)
+- [ ] Envío de correos de verificación y notificaciones con EmailJS
+- [ ] Ubicación en tiempo real del profesional durante el servicio
+- [ ] Pagos y métodos de pago
+- [ ] Publicación en App Store y Google Play
 
 ---
-
 ## 📝 Notas de Desarrollo
 
 - **Variables de entorno:** Nunca commitear `.env.local`
@@ -263,11 +293,23 @@ Ver `firestore_schema_basejob.md` para detalles completos.
 
 ---
 
-## 👨‍💻 Contribuidores
-
-Equipo de GoodJob
+## 🔗 Enlaces Útiles
+- [Documentación de Expo](https://docs.expo.dev)
+- [Firebase JS SDK](https://firebase.google.com/docs/web/setup)
+- [Firestore Database](https://firebase.google.com/docs/firestore)
+- [EmailJS Docs](https://www.emailjs.com/docs)
+- [OpenAI API Docs](https://platform.openai.com/docs)
+- [TypeScript Handbook](https://www.typescriptlang.org/docs)
+- [React Native Docs](https://reactnative.dev)
 
 ---
 
 
-**Last updated:** Julio 2026
+
+## 👥 Equipo
+
+Desarrollado por el equipo de **GOOBJOB**.
+
+<p align="center">
+  <sub>Última actualización: octubre 2026</sub>
+</p>
